@@ -1,0 +1,58 @@
+\chapter{Conclusion and Future Work}
+
+\section{Conclusion}
+
+Sieve is a new access control system
+that allows users to selectively expose
+their private cloud data to third party
+web services. Sieve leverages attribute-based
+encryption to translate human-understandable
+access policies into cryptographically
+enforceable restrictions, and
+is the first ABE system to protect against
+device loss and supports full revocation
+of both data and metadata. Unlike prior
+solutions for encrypted storage, Sieve is
+compatible with rich, legacy web applications
+that require server-side computation.
+As a proof of concept, we integrated Sieve
+with an open-source health monitoring
+service, showing that Sieve is a
+practical mechanism for protecting
+user data.
+
+\section{Future Work}
+
+There a number of interesting directions
+to follow up on Sieve. Sieve provides
+an access control mechanism for user-managed
+data for web applications. An interesting
+question is how can users interact with 
+each other in a peer-to-peer setting. 
+For example, can users share data or do 
+computations on each other's data
+revealing minimal data? Another interesting
+question is whether users can participate
+in surveys without revealing to the web
+application their value. For instance,
+assume Amazon wants to know how many
+people purchased an item. Can users
+release their data such that Amazon
+only learns the sum but not any
+individual answers.
+
+Finally, another area of interesting work
+involves Sieve user data after it has
+been released to web applications.
+Is there a way to control the flow
+of information out of applications
+based on ABE-policies? Is there a
+way to extend Sieve to regulate
+the export of data between applications
+and maybe other users.
+
+Sieve has envisioned a new web ecosystem
+that is beneficial for both applications
+and users. It is important to see how
+Sieve can be applied to other important
+web applications.

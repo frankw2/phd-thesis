@@ -1,0 +1,114 @@
+\chapter{Threat Model and Security Goals}
+\label{sec:threatModel}
+
+We focus on three kinds of principals. A
+\textbf{user} is someone who wants to store
+data online and selectively expose it
+to a \textbf{third party web service}. The
+user stores her (encrypted) data on a
+\textbf{cloud storage provider}. Each
+user has one storage provider, but
+potentially many third parties which
+need delegated access. We envision storage
+providers be operated by services 
+such as Amazon S3 and Microsoft
+Azure. Potential third party web services
+are FitBit, Lark, Misfit, Mint, and 
+any other application that generates new value
+from sensitive user data.
+
+\section{Threat Model}
+Sieve protects against a curious cloud
+provider or external attacker from
+gaining access to user data stored
+on the cloud storage provider. We assume
+the attacker is \textit{passive}, meaning
+they can access the data but do not interfere
+in any Sieve protocols. 
+
+Sieve prevents the web service from trying
+to access more data than allowed by its
+access policies. Moreover, Sieve allows for full revocation
+of a web service's data access:
+after revocation, the web service cannot
+access any previously retrievable data
+even if the storage provider is compromised.
+
+The user is trusted, but Sieve assumes that
+the user might lose devices. Sieve
+provides a way to recover from device 
+losses, but Sieve does not protect against
+a subverted device that the user believes 
+is functioning properly, i.e. a device
+installed with a rootkit.
+
+Sieve does not protect against client-side
+attacks like social engineering~\cite{socialEngineering}
+or cross-site scripting~\cite{xss}.
+
+\section{Security Goals}
+The user has a financial agreement with
+the storage provider: the user pays for the provider 
+to keep her objects and to participate in the
+Sieve protocol on her behalf.
+The user places encrypted data on the
+storage provider, but never reveals
+the decryption keys to the provider. 
+This protects the confidentiality of
+user data if the storage service is
+malicious or compromised. Using signatures,
+Sieve protects the data's
+integrity. However, Sieve cannot
+guarantee the availability or freshness
+of the data that the storage provider
+delivers to a web service. If desired,
+Sieve can be layered atop storage
+systems like CloudProof~\cite{cloudproof}
+which do provide those properties.
+
+Sieve does not hide access patterns
+or object metadata (i.e., attributes) from
+the storage provider. Thus, a curious
+provider can learn which encrypted
+objects a third party has been authorized
+to read, as well as the attributes
+that are associated with those objects.
+If users are concerned about data
+leakage via access patterns, they
+could layer Sieve atop an ORAM
+protocol~\cite{shroud}. To hide attributes,
+Sieve could also use predicate encryption~\cite{katz2008,shen2009}.
+However, ORAM and predicate encryption
+incur heavy performance overheads
+(\S\ref{sec:related}), so Sieve uses
+lighter weight mechanisms that reduce
+service latency at the cost of leaking
+more metadata. We believe that this
+trade-off is reasonable for many users
+and companies, given the importance
+of low latencies in modern web services~\cite{wprof,bobtail}.
+
+With respect to third party web services,
+Sieve's goal is to reveal user data only
+as permitted by the user's disclosure
+policies. After Sieve transmits information
+to a third party web server, Sieve cannot
+restrict what the third party does with that
+data, since third parties may cache user data
+locally, even after the user has revoked access
+to the canonical versions that reside on her
+storage server. Third parties can also share 
+decrypted user data with other
+principals via out-of-band, non-Sieve protocols
+like in the current web infrastructure.
+Solving these issues is beyond the scope of
+this paper. However, if a web service shares its user-issued
+ABE key, Sieve can revoke it, preventing
+those parties from downloading old or new
+user data from the storage provider
+(\S\ref{sec:revocation}).
+
+Sieve uses secret sharing to
+protect system-wide secrets like the ABE
+master key from the loss of a single device
+(\S\ref{sec:secretSharing}).

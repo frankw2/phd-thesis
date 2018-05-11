@@ -1,0 +1,182 @@
+\chapter{Related Work}
+\label{sec:related}
+
+Sieve is related to prior work in
+several areas: using cryptography to protect data on untrusted
+servers; using ABE to protect storage; using oblivious RAM; and other
+delegation protocols.  The rest of this chapter discusses these areas
+of related work in turn.
+
+\section{Untrusted servers} 
+Browser extensions
+like ShadowCrypt~\cite{shadowCrypt} transparently
+encrypt the data that a browser sends to
+unmodified cloud servers. Intentionally
+encrypted cloud stores like SUNDR~\cite{sundr},
+Depot~\cite{depot}, and SPORC~\cite{sporc}
+provide stronger consistency semantics in the
+face of server-side misbehavior; application
+logic runs solely on the client-side, over
+cleartext data, with clients exchanging encrypted
+data with servers. 
+Other systems that store encrypted data on servers
+and run application logic on the client-side
+include BStore~\cite{bstore} and DepSky~\cite{depSky}.
+All of these systems prevent
+data leakage due to server compromise or malice,
+but they are incompatible with applications that
+leverage server-side computation to add value to
+raw user data. In contrast, Sieve 
+is totally compatible with server-side computation.
+
+In CryptDB~\cite{cryptdb}, a web application
+consists of clients, an application server,
+and a back-end database. The database only
+contains encrypted data. Using SQL-aware encryption,
+the application server can execute queries over
+the encrypted data without revealing cleartext
+to the database. However, the application server
+does see cleartext, and can leak user data if
+compromised. Mylar~\cite{mylar} eliminates the
+need for an application server, but restricts
+the encrypted server-side computation to keyword
+searches. In both CryptDB and Mylar, applications
+control how user data is shared. In Sieve, user
+data is decoupled from applications, and users
+can selectively disclose individual objects to
+third parties.
+
+% Here's a semi-comprehensible slide deck about
+% Privly:
+%    https://github.com/privly/privly-organization/blob/master/presentations/2013-07-25-OSCON/OSCON.pdf
+% All of the other stuff that I've found is
+% even more vague and hand-wavy. If we're running
+% out of space in the paper, we should cut
+% the Privly discussion.
+Privly~\cite{privly} allows users to upload
+encrypted data to a storage server, and share
+hyperlinks to that data. The hyperlinks can be
+embedded in sites like a Facebook page, but
+the hyperlinks reveal no cleartext to the
+owner of the embedding site. Users register
+their decryption keys with Privly's browser
+extension. Later, when the user visits a page
+and her extension finds a Privly hyperlink,
+the extension transparently fetches the
+encrypted data, decrypts it, and rewrites
+the page's HTML, replacing the Privly link
+with the cleartext data. Privly does not supports
+the server-side computation enabled
+by Sieve.
+
+\section{ABE-protected storage} 
+Persona~\cite{persona},
+Priv.io~\cite{privio}, and Cachet~\cite{cachet}
+use ABE to selectively expose encrypted user data.
+In Persona and Priv.io, each user keeps her data
+in private cloud storage; in Cachet, data is
+stored in a peer-to-peer, distributed hash table.
+Unlike Sieve, these systems cannot delegate access
+to third party services, breaking compatibility
+with rich applications that require server-side
+computation.
+% Persona, Priv.io, and Cachet also lack Sieve's
+% standardized data schemas (\S\ref{sec:attrGen}).
+% Thus, these systems do not support multi-service
+% interoperability (i.e., users cannot write data
+% once, in a well-known format, and have that data
+% be seamlessly consumed by multiple third parties).
+Persona, Priv.io, and Cachet also trust each device
+for the  lifetime of the system, whereas Sieve
+distributes this trust. Finally, Sieve provides a
+concrete revocation protocol that safeguards user
+data if storage servers are compromised. Priv.io
+has no revocation strategy, and Persona suggests
+re-keying data, but does not provide a specific
+protocol. Cachet does implement revocation, but
+requires a trusted proxy which must interpose on
+all decryption operations, even in the common case
+that revocation is not underway~\cite{easier}.
+Cachet's revocation scheme also does not re-encrypt
+data on storage providers, leaving data encrypted
+under revoked keys vulnerable to subsequent
+compromises of the storage provider.
+
+\section{Predicate encrypted storage}
+GORAM~\cite{GORAM} is an oblivious RAM system
+that allows users to selectively share their
+cloud data with other users. Clients place
+encrypted data on servers so that servers cannot
+inspect it, and the clients' access patterns are
+hidden from servers using ORAM shuffling
+techniques~\cite{shroud}. Like Sieve, GORAM tags
+data objects with attributes; unlike Sieve,
+GORAM uses attribute-hiding predicate encryption~\cite{katz2008,shen2009}
+to restrict knowledge of attributes to the
+clients that possess matching decryption keys.
+
+GORAM's use of oblivious RAM and predicate
+encryption provides stronger security than Sieve,
+but at a performance cost. To hide
+data access patterns from storage servers, GORAM
+clients must perform \texttt{O(polylog(n))} more
+data accesses. Hiding attribute values using
+predicate encryption substantially increases 
+GORAM's ciphertext size and its encryption
+and decryption times. In comparison, Sieve
+provides lower-latency web services with less
+user friction. GORAM also forces users to
+determine a priori the maximum number of
+principals that can be mentioned in access
+control lists; if this list changes, a user must
+re-initialize her database. GORAM has no revocation
+scheme and assumes that users have one trusted
+device whereas Sieve provides a complete revocation
+scheme and prevents against device losses
+that might lead to a compromise of the whole
+system.
+
+\section{Access delegation schemes}
+
+%% aauth uses time slots for revocation
+
+OAuth~\cite{oauth} is a widely-used protocol
+for sharing cloud data across different web
+services. OAuth policies are written by web
+services, not by users, so users lack true
+authority over their access controls. OAuth
+also does not leverage cryptography to protect
+user storage or enforce access policies. As a
+result, users have no strong assurances about
+how their data is exposed. OAuth is
+also vulnerable to various kinds of data
+leaks~\cite{oauthbugs, oauthbugs2}.
+AAuth~\cite{aauth} is an extension of
+OAuth which uses cryptography
+to delegate access to encrypted data,
+but relies on the existence
+of various trusted parties to enforce
+access policies. In Sieve, users
+generate their own policies and distrust
+the storage server and third party
+applications. Sieve's protocols are 
+simpler, and Sieve's policy
+language is richer than AAuth's
+fixed policy schemas. AAuth's revocation scheme,
+like Persona's, only revokes access
+to the metadata block, but consider
+cached symmetric keys
+that might leak cleartext data when
+the cloud provider is compromised.
+
+The OAuth protocol generates a token
+that principals use to access sensitive
+data. Web services define many other types
+of ``bearer tokens.'' HTTP cookies~\cite{cookies}
+are a classic example. Macaroons~\cite{macaroons}
+improve upon cookies, using chained HMACs
+to verify and attenuate capabilities as a
+macaroon is passed between multiple parties.
+Cookies and macaroons vouch for a principal's
+post-authorization status, whereas Sieve
+deals with the authorization itself.

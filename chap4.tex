@@ -1,0 +1,42 @@
+\chapter{Implementation}
+\label{sec:implementation}
+Our Sieve prototype consists of a Sieve
+client, a storage provider daemon, and a
+Sieve import daemon that is run by third
+parties. Each component is written in Python,
+and uses PyCrypto~\cite{pyCrypto} to implement
+RSA and AES. For ABE operations, we use the
+libfenc~\cite{libfenc} library with elliptic
+curves~\cite{mnt224} from the Stanford
+Pairing-Based Cryptography library~\cite{pbc}.
+To build Sieve's key homomorphic symmetric
+cipher~\cite{keyhom}, we use the Ed448-Goldilocks
+elliptic curve library~\cite{ed448}.
+
+The storage provider daemon uses BerkeleyDB~\cite{berkdb}
+to store encrypted data blocks, and MongoDB~\cite{mongodb}
+to store metadata blocks. For each data block,
+the key is a GUID, and the value is a symmetrically
+encrypted object. For a metadata block, the
+key is a set of cleartext ABE attributes, and
+the value is an ABE-encrypted GUID and symmetric
+key. Metadata blocks are indexed by their
+attribute fields, and all metadata blocks for
+a particular user are stored in a MongoDB
+collection.
+% The libfenc library and Ed448-Goldilocks
+% elliptic curve libraries are written in C++,
+% so whenever we use these libraries,
+% we make RPC calls from our Python
+% code to call these functions.
+
+The JavaScript code in a web site interacts
+with the local Sieve client using a small
+RPC library that we provide. When a web site
+initially requests access to a user's data,
+the site's JavaScript sends an \texttt{XMLHttpRequest} 
+to a localhost webserver run by the Sieve
+client. The Sieve client then displays a
+GUI that allows the user to define an
+access policy for the site, and send the
+associated ABE key to the site's web server.
