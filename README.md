@@ -1,2 +1,2 @@
 # phd-thesis
-PhD thesis
+MIT PhD thesis
