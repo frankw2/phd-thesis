@@ -1,0 +1,16 @@
+\begin{BVerbatim}[commandchars=\\\{\}]
+\PY{n}{tmpfile} \PY{o}{=} \PY{l+s}{\PYZdq{}}\PY{l+s}{crashsafe.tmp}\PY{l+s}{\PYZdq{}}
+
+\PY{k}{def} \PY{n+nf}{crash\PYZus{}safe\PYZus{}update}\PY{p}{(}\PY{n}{filename}\PY{p}{,} \PY{n}{data\PYZus{}blocks}\PY{p}{)}\PY{p}{:}
+  \PY{n}{f} \PY{o}{=} \PY{n+nb}{open}\PY{p}{(}\PY{n}{tmpfile}\PY{p}{,} \PY{l+s}{\PYZdq{}}\PY{l+s}{w}\PY{l+s}{\PYZdq{}}\PY{p}{)}
+  \PY{k}{for} \PY{n}{block} \PY{k}{in} \PY{n}{data\PYZus{}blocks}\PY{p}{:}
+    \PY{n}{f}\PY{o}{.}\PY{n}{write}\PY{p}{(}\PY{n}{block}\PY{p}{)}
+  \PY{n}{f}\PY{o}{.}\PY{n}{close}\PY{p}{(}\PY{p}{)}
+
+  \PY{n}{fdatasync}\PY{p}{(}\PY{n}{tmpfile}\PY{p}{)}
+  \PY{n}{rename}\PY{p}{(}\PY{n}{tmpfile}\PY{p}{,} \PY{n}{filename}\PY{p}{)}
+  \PY{n}{fsync}\PY{p}{(}\PY{n}{dirname}\PY{p}{(}\PY{n}{filename}\PY{p}{)}\PY{p}{)}
+
+\PY{k}{def} \PY{n+nf}{crash\PYZus{}safe\PYZus{}recover}\PY{p}{(}\PY{p}{)}\PY{p}{:}
+  \PY{n}{unlink}\PY{p}{(}\PY{n}{tmpfile}\PY{p}{)}
+\end{BVerbatim}

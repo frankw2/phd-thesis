@@ -1,0 +1,54 @@
+{
+    "fscq-log": {
+        "largefile": 1.7017,
+        "avgwrite": 3.978062015503876,
+        "avgsync": 0.9988565891472868,
+        "re-read": 0.006,
+        "writes": 205268,
+        "seq-read": 0.006,
+        "syncs": 51541,
+        "rand-write": 67.9,
+        "seq-write": 0.145,
+        "rand-read": 0.011,
+        "writeops": 204808
+    },
+    "fscq-bypass": {
+        "largefile": 2.13115,
+        "avgwrite": 1.0515697674418605,
+        "avgsync": 1.0066472868217053,
+        "re-read": 0.006,
+        "writes": 54261,
+        "seq-read": 0.006,
+        "syncs": 51943,
+        "rand-write": 84.722,
+        "seq-write": 0.501,
+        "rand-read": 0.011,
+        "writeops": 53242
+    },
+    "ext4-async-bypass": {
+        "largefile": 0.5675749999999999,
+        "avgwrite": 0.99765503875969,
+        "avgsync": 0.968624031007752,
+        "re-read": 0.006,
+        "writes": 51479,
+        "seq-read": 0.006,
+        "syncs": 49981,
+        "rand-write": 22.638,
+        "seq-write": 0.042,
+        "rand-read": 0.011,
+        "writeops": 51214
+    },
+    "ext4-async-log": {
+        "largefile": 0.673475,
+        "avgwrite": 4.120271317829458,
+        "avgsync": 0.1623643410852713,
+        "re-read": 0.006,
+        "writes": 212606,
+        "seq-read": 0.006,
+        "syncs": 8378,
+        "rand-write": 26.882,
+        "seq-write": 0.034,
+        "rand-read": 0.011,
+        "writeops": 103116
+    }
+}

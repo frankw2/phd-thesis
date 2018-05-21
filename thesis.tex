@@ -1,0 +1,339 @@
+% -*- TeX-PDF-mode: t -*-
+
+\newif\ifdraftfooter\draftfootertrue
+
+% draft - Fast compilation, all XXX notes, draft+git footers
+%\documentclass[11pt,twoside,draft]{mitthesis}
+% (no option) - Full compilation, all XXX notes, draft+git footer
+%\documentclass[11pt,twoside]{mitthesis}
+% proof - Full compilation, no XXX notes, draft+git footer
+%\documentclass[11pt,twoside,final,proof]{mitthesis}
+% final - Full compilation, no XXX notes, no footer
+\documentclass[11pt,twoside,final]{mitthesis} \draftfooterfalse
+
+\usepackage{pdfsync}
+\synctex=1
+
+\usepackage[square,comma,numbers,sort&compress]{natbib}
+
+% Put hyperref in final mode; otherwise hyperlinks are disabled
+\usepackage[pdfauthor={Frank Yi-Fei Wang},
+            pdftitle={Preventing Data Leakage for Web Service Accesses},
+            breaklinks,hidelinks,final,
+            bookmarksdepth=3]{hyperref}
+
+% Fonts
+\usepackage[T1]{fontenc}
+\usepackage[defaultsans]{lato}
+% [lf] - Use lining figures by default.  Mostly because I say things
+% like "CPU 0" a lot in the text and old style figures make that look
+% really weird.
+%\usepackage[lf,footnotefigures]{MinionPro} % After amssymb
+%\usepackage[toc,bib]{tabfigures}
+% No Minion Pro?  Uncomment the next line to use Times
+%\usepackage{times,mathptmx}
+%\usepackage{amssymb}
+%\usepackage{mathrsfs}
+%\usepackage{amsfonts}
+%\usepackage{textcomp}
+\usepackage{verbatim}
+\usepackage{amsmath}
+\usepackage[charter]{mathdesign}
+\usepackage{xspace}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{listings}
+\usepackage{balance}
+\usepackage{subfig}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{rotating}
+\usepackage{fancyvrb}
+\usepackage{lastpage}
+\usepackage{alltt}
+\usepackage{etoolbox}
+\usepackage{ifdraft}
+\usepackage{titlesec}
+\usepackage{cleveref} % After hyperref, listings
+\usepackage{fancyhdr}
+\usepackage{semantic}
+\usepackage{mathtools}
+\usepackage{etoolbox}
+
+\IfFileExists{microtype.sty}{
+  \usepackage{microtype}
+}{
+  \PackageError{microtype}{Package microtype not found.  Please
+    install texlive-latex-recommended}{}
+}
+
+% Local packages below here
+
+\usepackage{xxxnotes}
+\usepackage{wordnum}
+% Set up fancyhdr before gitinfo
+\fancypagestyle{plain}{%
+  \fancyhead{}
+  \renewcommand{\headrulewidth}{0pt}
+}
+% If I just \pagestyle{plain}, the left and right footers shift back
+% and forth on each page.
+\AtBeginDocument{\pagestyle{plain}}
+\usepackage{gitinfo}
+
+%\usetikzlibrary{shapes.geometric}
+
+\input{glyphtounicode}
+\pdfgentounicode=1
+
+% By default, when including another PDF, rather than including its
+% fonts directly, pdfTeX will look for the fonts by name in the fonts
+% that it knows and use those (to deduplicate against document fonts).
+% Unfortunately, this deduplication has the side-effect of disabling
+% pdfTeX's subsetting of the copy of the font included in the PDF.
+% This has two consequences.  1) The final PDF gets much bigger.  And
+% 2) some PDF engines choke on the complete Minion Pro.  Acroread,
+% Evince, and Okular handle it, but at least RepliGo Reader and
+% Quickoffice for Android do not (which appear to have a common
+% ancestry).
+%
+% The below directive tells pdfTeX to keep the fonts that come in PDF
+% inclusions.  The result is that we get both Type 1 (body) and Type
+% 1C (figures) copies of Minion Pro, but the document renders
+% correctly.  pdfTeX appears to still merge the Type 1C fonts from the
+% various inclusions, so we only wind up with two copies, not several.
+% This also makes the final PDF smaller because the sum of the two
+% subsetted fonts is smaller than the full Minion Pro.
+\pdfinclusioncopyfonts=1
+
+%\DeclareMathAlphabet{\mathcal}{OMS}{cmsy}{m}{n}
+
+% If we're building without Minion Pro, define away \figureversion and
+% \sscshape
+\ifx\figureversion\undefined%
+  \def\figureversion#1{}
+\fi
+\ifx\sscshape\undefined%
+  \let\sscshape=\scshape
+\fi
+
+% Draft footer
+\ifdraftfooter
+\ifoptiondraft{\fancyfoot[L]{\textbf{FAST DRAFT}}}%
+{\fancyfoot[L]{\textbf{DRAFT}}}
+\fi
+
+% Set page number footer in old style numerals
+\fancyfoot[C]{{\figureversion{text}\thepage}}
+
+% One space after periods
+\frenchspacing
+
+% Avoid widows and orphans
+\widowpenalty=500
+\clubpenalty=500
+
+% Double spacing is too big; single spacing is too small
+\linespread{1.15}
+
+% Disable annoying inter-paragraph vertical spacing
+\raggedbottom
+
+% Bring in margins a bit.  The measure at 11pt on a 5.5" body is
+% pretty reasonable (and almost identical to 12pt on a 6" body).
+\addtolength{\textwidth}{-0.5in}
+\addtolength{\oddsidemargin}{0.25in}
+\addtolength{\evensidemargin}{0.25in}
+\addtolength{\topmargin}{0.25in}
+\addtolength{\textheight}{-0.5in}
+
+% Aggressive figure placement
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.8}
+\setcounter{topnumber}{2}
+\setcounter{bottomnumber}{2}
+\setcounter{totalnumber}{4}
+\setcounter{dbltopnumber}{2}
+\renewcommand{\dbltopfraction}{0.9}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.7}
+\renewcommand{\dblfloatpagefraction}{0.7}
+
+\setlength{\marginparwidth}{0.8in}
+
+% For text from the SOSP paper, define CompactItemize
+\newenvironment{CompactItemize}{\begin{itemize}}{\end{itemize}}
+
+% Fix things like \emph{foo\xspace}.  See
+% http://tug.org/pipermail/texhax/2006-November/007339.html
+\makeatletter
+\xspaceaddexceptions{\check@icr}
+\makeatother
+
+% Listing style
+\lstset{basicstyle=\fontsize{9}{9}\sffamily,showstringspaces=false,columns=fullflexible}
+
+% Use \code{...} to typeset text in code font.  "_"s are accepted in
+% the argument of \code.  You can use \code in math mode and you can
+% use $math$ in \code.
+\makeatletter
+\def\code{\protect\@code}
+\newlength\code@factor
+\setlength\code@factor{0.9pt}
+\newlength\code@space
+\setlength\code@space{1.2pt}
+\def\codefont{\fontsize{\f@size\code@factor}{\f@size\code@factor}\sffamily}
+\def\figcodefont{\fontsize{\f@size\code@factor}{\f@size\code@space}\ttfamily}
+% Underscore trick derived from http://tex.stackexchange.com/a/146066
+\begingroup
+% At definition time the token `_` must be active
+\catcode`_=\active
+\gdef\code@activate@us{%
+  \let_\textunderscore
+  \catcode`\_=\active
+}
+\endgroup
+\def\@code#1{\ifmmode\text{\@@code{#1}}\else\@@code{#1}\fi}
+% Match x-height of 10.95pt Minion Pro to 9.5pt Lato
+\def\@@code#1{\begingroup\code@activate@us
+  \codefont%
+  \scantokens{#1\endinput}%
+  \endgroup
+}
+\makeatother
+\let\syscall=\code
+% Code in gnuplot labels
+\let\gpcode=\code
+% Command names
+\let\cmd=\code
+\let\gpcmd=\gpcode
+% Or don't typeset command names differently
+%\newcommand{\cmd}[1]{#1}
+%\newcommand{\gpcmd}[1]{#1}
+
+\def\UrlFont{\codefont}
+
+\RecustomVerbatimEnvironment{Verbatim}{Verbatim}{formatcom=\footnotesize}
+
+
+\input{cmds}
+
+\newcommand{\inputcode}[1]{%
+  {\small\hrule\vspace{0.5em}\input{#1}\hrule\vspace{0.5em}}}
+
+\newcommand{\inputnodraft}[1]{%
+  \ifdraft{#1 omitted in draft mode}{\input{#1}}}
+
+\makeatletter
+% XXX I'd much rather strip all periods from *all* captions in the
+% list of figures, but I can't for the life of me get TeX to do that.
+\def\sc@oneperiod#1.{\@ifnextchar.{\sc@oneperiod #1}{#1.}}
+\newcommand{\splitcaption}[2]{%
+  \caption[\protect\sc@oneperiod #1.]{#1 #2}}
+\makeatother
+
+%\newcommand{\tikzshowbbox}{
+%  \path[draw=black] (current bounding box.north west)
+%    rectangle (current bounding box.south east);
+%  \fill[overlay,black] (0,0) circle (.5mm);
+%  \draw[overlay,black] (0,2mm) -- +(0,5mm) (0,-2mm) -- +(0,-5mm)
+%                       (2mm,0) -- +(5mm,0) (-2mm,0) -- +(-5mm,0);}
+
+\makeatletter
+\newcommand{\asterism}{%
+  \noindent\par\vspace{1em}%
+  {\hfill $*$ \hspace{3em} $*$ \hspace{3em} $*$ \hfill}\vspace{1em}%
+  \par\@afterindentfalse\@afterheading
+}
+\makeatother
+
+\bibpunct[: ]{[}{]}{,}{n}{XXX}{XXX}
+
+% Do always capitalize "Figure".  Also override the default "Fig."
+\crefname{figure}{Figure}{Figures}
+\crefname{mysubfigure}{Figure}{Figures}
+\Crefname{mysubfigure}{Figure}{Figures}
+\newcommand{\thiscref}[1]{this \lcnamecref{#1}}
+\newcommand{\Thiscref}[1]{This \lcnamecref{#1}}
+
+% Single-line format with chapter number and a vertical bar.
+% \titleformat{\chapter}[hang]{%
+%   \huge\bfseries}{\thechapter\hspace{15pt}\rule[-1.2em]{.5pt}{3em}\hspace{15pt}}{0pt}{\huge\bfseries}
+
+% Two-line format with spelled-out chapter number and a horizontal bar
+% under the title.
+\titleformat{\chapter}[display]%
+  {\relax}%
+  {\sscshape\Wordnum{\thechapter}}{1em}%
+  {\huge\bfseries}[\titlerule]
+
+% Make the TOC only list chapters and sections
+\setcounter{tocdepth}{1}
+
+% Make tables use the same numbering and format as figures
+\makeatletter
+\let\thetable\thefigure
+\let\c@table\c@figure
+\makeatother
+
+% Fold the one table in to the list of figures
+\makeatletter
+\renewcommand\ext@table{lof}
+\makeatother
+\renewcommand\listfigurename{Figures and tables}
+
+\begin{document}
+
+\input{code/fmt}
+
+\input{title}
+\cleardoublepage
+
+\begin{abstractpage}
+\input{abstract}
+\end{abstractpage}
+\cleardoublepage
+
+\begin{singlespace}
+\input{acks}
+\end{singlespace}
+
+\pagestyle{plain}
+\tableofcontents
+\newpage
+\listoffigures
+
+% The preamble folded tables in to the list of figures
+% \newpage
+% \listoftables
+
+% Shift sectioning commands to start at \chapter
+\let\subsubsubsection\subsubsection
+\let\subsubsection\subsection
+\let\subsection\section
+\let\section\chapter
+
+%\input{intro}
+%\input{relwk}
+%\input{bkgrd}
+%\input{chl}
+%\input{log}
+%\input{spec}
+%\input{impl}
+%\input{eval}
+%\input{concl}
+
+{
+\begin{singlespace}
+% Since we're using natbib in numbers mode, we don't need plainnat,
+% which exists to feed authors and years back in to natbib.  As a
+% result, it complains about entries without years, which we don't
+% care about.
+%\bibliographystyle{plainnat}
+\bibliographystyle{plain}
+\bibliography{n-str,p,n,n-conf}
+\end{singlespace}
+}
+
+\end{document}

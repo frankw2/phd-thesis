@@ -1,0 +1,13 @@
+\begin{tabular}{lrrrr}
+\toprule
+  & \multicolumn{2}{c}{\bf \cc{largefile}}
+  & \multicolumn{2}{c}{\bf \cc{mailbench}}
+  \\
+  & writes & syncs & writes & syncs \\
+\midrule
+\sys-bypass  &    1.0 &    1.0 &   50.0 &    9.8 \\ 
+ext4-bypass  &    1.0 &    1.0 &   38.0 &    7.5 \\ 
+\sys-log     &    4.0 &    1.0 &   28.8 &    3.5 \\ 
+ext4-log     &    5.0 &    1.0 &   38.3 &    3.7 \\ 
+\bottomrule
+\end{tabular}

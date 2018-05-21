@@ -1,0 +1,18 @@
+#!/bin/bash
+
+URL=https://raw.githubusercontent.com/aclements/latexrun/master/latexrun
+TOOL=$(which latexrun)
+
+if [ -z "$TOOL" ]; then
+    dst="bin/latexrun"
+    if [ ! -x "$dst" ]; then
+        (>&2 echo "Getting latexrun from $URL")
+        curl -s "$URL" -o "$dst"
+        chmod +x "$dst"
+    fi
+    if [ -x "$dst" ]; then
+        TOOL="$dst"
+    fi
+fi
+
+echo "$TOOL"

@@ -1,0 +1,707 @@
+\section{Certifying FSCQ's logging system}
+\label{sec:log}
+
+\newcommand{\logapi}{LogAPI\xspace}
+\newcommand{\grouplog}{GroupCommit\xspace}
+\newcommand{\memlog}{Applier\xspace}
+\newcommand{\disklog}{DiskLog\xspace}
+
+The previous chapters provide examples of specifications for a basic
+logging protocol, written in \chl.  This chapter explores how to build and
+certify \syslog, an I/O-efficient logging system that implements
+performance-critical optimizations such as deferred apply, group commit,
+log checksum and log bypass.  These techniques, as we explained in
+\Cref{sec:bkgrd:log}, reduce the number of writes and write barriers per
+transaction, while still guaranteeing crash safety.  These optimizations
+are standard to other file systems but have never been formally
+specified or verified until now.  The \syslog implements these
+optimizations internally, while providing the same synchronous disk
+abstraction as in previous chapters.
+
+\subsection{Overview}
+
+Verifying a single optimization is challenging enough because most system
+optimizations are based on a programmer's assumptions, which are rarely
+formalized. Verifying many together is even more challenging because of the
+number of simultaneously moving parts. Each additional optimization
+requires not only a proof that the overall logging specification still
+holds, but also a proof that all previous assumptions still hold.
+For example, group commit assumes that metadata operations can be deferred
+as long as their orders are preserved, and log bypass further allows
+deferring and re-ordering non-metadata updates; combining the two to
+support a general deferred-write optimization poses a new challenge: is it
+safe to re-order non-metadata updates against metadata updates?
+
+The key idea behind verifying a system with many optimizations is one
+familiar from building the unverified equivalent: modularity.  \syslog is
+composed of four logical layers: \logapi, \grouplog, \memlog, and \disklog,
+shown in \Cref{fig:log}.  Each layer has a formal specification, along with
+a proof that its implementation meets its specification.  This modular
+design makes \syslog amenable to formal verification because each layer
+only tackles a simple task or a single optimization.  It also allows
+changing the implementation of a layer without affecting the proofs in
+other layers.
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figs/log.pdf}
+  \caption[Illustration of \syslog layers and the timeline of a transaction]
+  { Illustration of \syslog layers and the timeline of a transaction.
+  Transactional writes are added to an \V{activeTxn} map in the \logapi
+  layer.  When the application calls \cc{commit}, \V{activeTxn} is buffered
+  in a list of pending transactions in \grouplog. When \cc{flush} is called
+  on \grouplog, all pending transactions are appended to disk together as a
+  single transaction in the \disklog layer. At this point, the transactions
+  are durable, and \memlog can lazily apply and truncate the log records.}
+  \label{fig:log}
+\end{figure}
+
+\paragraph{\logapi.}
+
+The uppermost layer, \logapi, exposes an interface with a single active
+transaction and allows the higher-level code (i.e., the file system) to
+read and write disk blocks.  Writing blocks builds up an in-memory
+transaction, which is passed to the \grouplog layer once the higher-level
+code invokes \cc{log\_commit}.  \logapi exposes the size of the transaction
+in its specification and guarantees that transactions below a certain size
+will be able to commit.  This is necessary for proving that some system
+calls that potentially update many disk blocks (e.g., \cc{unlink} might
+change all block-bitmap blocks when freeing a large file) do not fail given
+sufficient log space.
+
+\paragraph{\grouplog.}
+
+\grouplog accepts committed transactions from \logapi and buffers them in
+an in-memory transaction list.  \grouplog exposes a \cc{flush} function,
+which combines all buffered transaction into a single transaction and then
+flushes it to the on-disk log.  \cc{flush} allows the file system to
+implement the \cc{fsync} system call by flushing all metadata changes from
+\grouplog to disk.  \grouplog's specification also allows it to flush
+transactions to disk on its own at any time.  \grouplog remembers
+boundaries of transactions it receives. In case the merged transaction
+exceeds the maximum transaction size, \grouplog falls back to committing
+individual transactions in turn.
+
+\paragraph{\memlog.}
+
+\memlog manages the data part of the disk (i.e., everything but the log) by
+applying the log entries to the disk when the on-disk log fills up.  By
+employing deferred apply, \memlog is able to absorb
+repeated writes to the same address in multiple transactions. To do this,
+\memlog keeps a copy of all flushed entries in memory when forwarding
+flushing requests from \grouplog to \disklog.
+
+\paragraph{\disklog.}
+
+Finally, \disklog lays out the log on disk.  It provides three functions:
+\cc{append}, \cc{truncate}, and \cc{recover} (which returns the on-disk log
+contents).  It takes care of packing and unpacking the commit block and log
+entries on disk.  \disklog also exposes the size of the on-disk log to
+guarantee that transactions of a certain size will fit and thus be able to
+commit.  \disklog uses log checksum to ensure that \cc{append} and
+\cc{truncate} are crash-safe while using just one disk sync (to ensure that
+the entire transaction is flushed to disk, rather than to order writes
+within the transaction).  \disklog's \cc{recover} function also uses
+checksums to determine whether the last call to \cc{append} fully made it
+to disk or not, and returns the corresponding list of on-disk log entries
+to the caller.
+
+Each layer (except for \disklog) also caches copies of transaction updates
+in an in-memory map to serve reads efficiently. As shown in \Cref{fig:log},
+\logapi buffers the file system's single active transaction
+(\V{activeTxn}). \grouplog merges each committed transaction that it
+receives into a single in-memory transaction (\V{committedTxns}), which is
+cleared at every flush. Similarly, \memlog collapses all flushed
+transactions into an in-memory map that is cleared every time the log is
+applied and truncated (\V{flushedTxns}).  When an application calls
+\cc{read}, the log tries to find the requested address in each of these
+layers, from highest to lowest, before reading from disk.
+
+\subsection{Representation invariants}
+
+As described in \Cref{s:chl:ns}, \syslog's specifications use
+representation invariant to relate the abstract state of a higher layer to
+the its lower-layer state.  For example, \disklog defines
+\cc{disklog\_rep}, which describes how logical log entries (as a list of
+block address and value pairs) are laid out on the log region of the disk.
+\memlog, in turn, includes \cc{disklog\_rep} as part of its own
+\cc{applier\_rep}, and combines it with other points-to facts that
+relate the logical log entries to the data region of the disk.  In its
+easiest form, where there is no ongoing log-apply or log-flush, the
+definition of \cc{applier\_rep} is shown in \Cref{fig:applier_rep}.
+
+\begin{figure}[htb]
+\centering
+\specfont
+\begin{equation*}
+\begin{aligned}
+  \F{applier\_rep}\,
+  & (\,\V{navail}, ~\V{flushed\_disk})~\defeq \\
+  & \F{disklog\_rep}(\C{Synced},~\V{navail},~\V{flushedTxns}) * \\
+     &(\forall a, ~\V{unapplied\_disk}(a) = \valuset{v}{vs} \; =>\;
+          a |+> \valuset{v}{vs}) \AND \\
+  & \V{flushed\_disk} = \F{replay}\,(\V{unapplied\_disk}, ~\V{flushedTxns})
+\end{aligned}
+\end{equation*}
+\caption{Part of \memlog's representation invariant}
+\label{fig:applier_rep}
+\end{figure}
+
+\cc{applier\_rep} states that the physical disk is divided into two
+disjoint regions: the log region and the data region. \cc{disklog\_rep}
+describes the state of the log region, which contains all flushed but
+not-yet-applied transactions, represented by \V{flushed\_Txns}; and
+\V{unapplied\_disk} is the on-disk state of the data region.  By replaying
+\V{flushed\_Txns} on \V{unapplied\_disk}, \cc{applier\_rep} exports a new
+logical disk \V{flushed\_disk} in its argument, which combines the on-disk
+data region with all flushed transactions to present a view of the
+persisted disk state.  The other argument of \cc{applier\_rep}, \V{navail},
+is the number of available log entries exported by \disklog; it is useful
+for higher layers to reason about whether a commit or a flush would
+succeed.
+
+Similarly, as shown in \Cref{fig:group_rep}, \grouplog's representation
+invariant \cc{group\_rep} uses \cc{applier\_rep} to describe the disk state
+which currently persists on disk.  On top of it, \cc{group\_rep} describes
+a sequence of logical disks, namely \V{disk\_seq}, each representing the
+end state of a committed but not-yet-flushed transaction.  The definition
+in \Cref{fig:group_rep} assumes the first disk (i.e., {\V{disk\_seq}[0]})
+is persisted on disk, and each subsequent disk in \V{disk\_seq} is derived
+from its predecessor by applying the corresponding committed transaction
+from \V{committedTxns}.  The abstraction exported by \cc{group\_rep} is
+called a \emph{disk sequence}. In \Cref{sec:spec} we further justify the
+choice of the disk sequence abstraction and investigate how it helps to
+write a file system's specifications.
+
+\begin{figure}[htb]
+\centering
+\specfont
+\begin{equation*}
+\begin{aligned}
+  \F{group\_rep}\, & (\,\V{disk\_seq})~\defeq \\
+  & \F{applier\_rep}(\V{navail},~\V{disk\_seq}[0]) \AND \\
+  & (\forall i,\; 0 < i < \len{\V{disk\_seq}} => \\
+  & \qquad \len{\V{committedTxns}[i-1]} \leq \C{MaxLogLen} \AND \\
+  & \qquad \V{disk\_seq}[i] = 
+    \F{replay}\,(\V{disk\_seq}[i-1],~\V{committedTxns}[i-1]))
+\end{aligned}
+\end{equation*}
+\caption{Part of \grouplog's representation invariant}
+\label{fig:group_rep}
+\end{figure}
+
+\Cref{fig:log_rep_new} shows the top-level representation invariant
+\cc{log\_rep}, whose signature looks almost identical to the one shown in
+\Cref{fig:logrep}, except that it now uses a disk sequence, as opposed to a
+single logical disk, to describe the transaction's starting state.
+``$\latest{disk\_seq}$'' denotes the last disk in the disk sequence;
+applying the active transaction's log entries (\V{activeTxn}) to the latest
+disk produces \V{cur\_state}, the logical disk that represents the
+transaction's current view.  If there is no active transaction,
+\cc{log\_rep} requires \V{activeTxn} to be empty.
+
+Note that most of the above representation invariants have more
+sophisticated forms which show up only during crash and recovery.  For
+simplicity we do not show them here but will explain them as we encounter
+them.
+
+\begin{figure}[htb]
+\centering
+\specfont
+\begin{equation*}
+\begin{aligned}
+  \F{log\_rep} \, & (\C{ActiveTxn}, ~\V{disk\_seq}, ~\V{cur\_state})~\defeq \\
+  & \F{group\_rep}(\V{disk\_seq}) \AND \\
+  & \V{cur\_state} = \F{replay}\,(\latest{disk\_seq}, ~\V{activeTxn})
+  &\\
+  \F{log\_rep} \, & (\C{NoTxn}, ~\V{disk\_seq})~\defeq \\
+  & \F{group\_rep}(\V{disk\_seq}) \AND \V{activeTxn} = \empset
+\end{aligned}
+\end{equation*}
+\caption{Part of \logapi's representation invariant}
+\label{fig:log_rep_new}
+\end{figure}
+
+
+\subsection{Logging-system specifications}
+
+Given these representation invariants, we now demonstrate how to use them
+to write \syslog's internal and external specifications.  We consider an
+interesting scenario where the user of \syslog (i.e., the file system) uses
+\cc{log\_commit} to commit a transaction and subsequently calls
+\cc{log\_flush} to make sure the change persists.  The call graph used
+in this section is shown in \Cref{fig:log-call}.
+
+\begin{figure}[htb]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figs/logcall.pdf}
+  \caption{Call graph for \cc{log\_commit} and \cc{log\_flush}}
+  \label{fig:log-call}
+\end{figure}
+
+\Cref{fig:spec_log_commit} shows the specification of \cc{log\_commit}.
+The spec says that \cc{log\_commit} transits from ``active transaction''
+state to ``no transaction'' state, and it can either succeed (return true)
+or fail (return false).  If it succeeds, the logical disk for the active
+transaction \V{cur\_disk} is appended to the disk sequence \V{disk\_seq};
+if it fails, the transaction is aborted, and \V{disk\_seq} will remain
+unchanged.  In addition, the specification also says that if commit fails,
+it must be the case that the size of the transaction (total number of log
+entries in \V{activeTxn}) exceeds the logging system's limit, denoted by
+constant \C{MaxLogLen}.  This error condition allows the caller to prove
+that certain operations (such as \cc{unlink}) will always succeed (by
+showing that $\len{\V{activeTxn}} \le \C{MaxLogLen}$, thus proving
+that the failure case in the postcondition cannot happen).
+
+\begin{figure}[htb]
+\begin{spec}
+    \SPEC  {\PROC{log\_commit}{}}
+    \PRE   {\PRED{disk}{\F{log\_rep}(\C{ActiveTxn}, \V{disk\_seq}, \V{cur\_disk})}}
+    \POST  {\PRED{disk}{%
+            $ ( \V{ret} = \true\;\AND 
+                \F{log\_rep}(\C{NoTxn},~\cons{cur\_disk}{disk\_seq})) \OR $ \BR
+            $ ( \V{ret} = \false \AND
+                \F{log\_rep}(\C{NoTxn},~\V{disk\_seq})
+                \AND \len{\V{activeTxn}} > \C{MaxLogLen}) $
+            }}
+    \CRASH {\PRED{disk}{\F{log\_rep}(\C{NoTxn}, \V{disk\_seq})}}
+\end{spec}
+\caption{Specification for \logapi's \cc{log\_commit}}
+\label{fig:spec_log_commit}
+\end{figure}
+
+Internally, \cc{log\_commit} calls \grouplog's
+\cc{group\_commit}(\V{activeTxn}), which buffers the transaction in memory.
+The specification of \cc{group\_commit} is shown in
+\Cref{fig:spec_group_commit}.  This specification looks similar to
+\Cref{fig:spec_log_commit}, except that it expands \V{cur\_disk}, using the
+fact that directly derives from \logapi's representation
+invariant~(\Cref{fig:log_rep_new}). As \cc{group\_commit} only changes the
+in-memory state, its crash condition is the same as its precondition.
+
+\begin{figure}[htb]
+\begin{spec}
+    \SPEC  {\PROC{group\_commit}{ents}}
+    \PRE   {\PRED{disk}{\F{group\_rep}(\V{disk\_seq})}}
+    \POST  {\PRED{disk}{%
+            $ ( \V{ret} = \true~\AND \F{group\_rep}(\cons{\F{replay}\,(
+               \latest{disk\_seq},~\V{ents})}{disk\_seq} \OR $ \BR
+            $ ( \V{ret} = \false \AND \F{group\_rep}(\V{disk\_seq}) \AND
+                \len{\V{ents}} > \C{MaxLogLen}~) $
+            }}
+    \CRASH {\PRED{disk}{\F{group\_rep}(\V{disk\_seq})}}
+\end{spec}
+\caption{Specification for \grouplog's \cc{group\_commit}}
+\label{fig:spec_group_commit}
+\end{figure}
+
+Next, the user calls the top-level \cc{log\_flush}, whose specification is
+shown in \Cref{fig:spec_log_flush}.  The specification simply says that,
+after \cc{log\_flush} returns, the disk sequence contains only the latest
+disk from before \cc{log\_flush}. This latest disk reflects all of the
+previously committed transactions.
+
+One interesting aspect of \cc{log\_flush}'s spec is the crash condition:
+``\cc{would\_recover\_any} (\V{disk\_seq})'' says that if the system were
+to crash, the state on disk after the crash is the state corresponding to
+one of the disks in \V{disk\_seq}.  This is because \cc{log\_flush}
+internally calls \grouplog's flush procedure \cc{group\_flush}, which in
+turn calls \memlog's \cc{applier\_flush}, with the merged transaction as
+the argument (i.e.,
+\cc{applier\_flush}(\cc{merge}(\V{committedTxns}))). In this case, the
+logging system will recover into either the first or the last disk in
+\V{disk\_seq}.  It is also possible that \grouplog cannot merge the
+transactions (because the resulting transaction is too large to fit into
+the log) and falls back to flush each transactions in turn using
+\cc{applier\_flush}.  If this is the case, the logging system can recover
+into any of the disks in \V{disk\_seq}.  Both cases are captured by
+\cc{would\_recover\_any}.
+
+\begin{figure}[htb]
+\begin{spec}
+    \SPEC  {\PROC{log\_flush}{}}
+    \PRE   {\PRED{disk}{\F{log\_rep}(\C{NoTxn},~\V{disk\_seq})}}
+    \POST  {\PRED{disk}{\F{log\_rep}(\C{NoTxn},~\{\latest{disk\_seq}\})}}
+    \CRASH {\PRED{disk}{\F{would\_recover\_any}(\V{disk\_seq})}}
+\end{spec}
+\caption{Specification for \logapi's \cc{log\_flush}}
+\label{fig:spec_log_flush}
+\end{figure}
+
+The specification of \cc{applier\_flush} is shown in
+\Cref{fig:spec_applier_flush}, which also contains a success case and a
+failure case.  However, the \grouplog layer can conclude that the failure
+case will never happen.  This is because (1) the code of \cc{group\_flush}
+first checks if the merged transaction is bigger than \cc{MaxLogLen} and
+falls back to flushing individual transactions in that case; and (2)
+\cc{group\_commit} will reject a transaction whose size is bigger than
+\cc{MaxLogLen}, so that every buffered transaction is within the size
+limit. The second constraint is encoded in the representation invariant
+shown in \Cref{fig:group_rep}.
+
+The crash condition of \cc{applier\_flush} is a
+``\cc{would\_recover\_either}'' predicate, which says that the procedure
+will recover into either before or after the given transaction---the usual
+behavior of basic write-ahead logging.  The ``\cc{would\_recover\_any}''
+predicate we have seen in \Cref{fig:spec_log_flush} is defined using
+\cc{would\_recover\_either} by choosing pairwise disks from \V{disk\_seq}.
+
+\begin{figure}[htb]
+\begin{spec}
+    \SPEC  {\PROC{applier\_flush}{ents}}
+    \PRE   {\PRED{disk}{\F{applier\_rep}(\V{navail},~\V{flushed\_disk})}}
+    \POST  {\PRED{disk}{%
+            $ ( \V{ret} = \true\;\AND \F{applier\_rep}
+                (\V{navail}',~\F{replay}\,(\V{flushed\_disk},~\V{ents}))) \OR $ \BR
+            $ ( \V{ret} = \false \AND \F{applier\_rep}
+                (\V{navail},~\V{flushed\_disk}) \AND $ \BR
+            $ \qquad\qquad\qquad  \len{\V{ents}} > \C{MaxLogLen}) $
+            }}
+    \CRASH {\PRED{disk}{\F{would\_recover\_either}(\V{flushed\_disk},
+            \F{replay}(\V{flushed\_disk},~\V{ents}))}}
+\end{spec}
+\caption{Specification for \memlog's \cc{applier\_flush}}
+\label{fig:spec_applier_flush}
+\end{figure}
+
+Inside \cc{applier\_flush}, if it sees the available log space \V{navail}
+is too small to fit the passed-in transaction~(\V{ents}), the code will first
+invoke \cc{applier\_apply} to make room for the new transaction.
+\cc{applier\_apply} applies and truncates the on-disk log. Its
+specification is shown in \Cref{fig:spec_applier_apply}.  The postcondition
+of \cc{applier\_apply} resets the available log space to its maximum value.
+Other than that, the specification exhibits a no-op-like behavior such that
+\memlog is free to invoke it anytime. 
+
+Also note that the crash condition in \Cref{fig:spec_applier_apply} is
+different from its precondition. This is because \cc{applier\_apply} will
+call \cc{disklog\_truncate} to clear the log, and \cc{disklog\_truncate}
+might leave the log in an \emph{unsynced} state, in which \disklog just
+overwrites the commit block but has not yet issued a write barrier to
+persist the change.  The unsynced state is not captured by the regular form
+of \cc{applier\_rep} shown in \Cref{fig:applier_rep}.  Nevertheless, this
+does not invalidate the fact that applying the log is an idempotent
+operation and will always recover to \V{flushed\_disk} as in the
+precondition. The ``\cc{would\_recover\_before}'' predicate exactly
+captures this property.
+
+\begin{figure}[htb]
+\begin{spec}
+    \SPEC  {\PROC{applier\_apply}{}}
+    \PRE   {\PRED{disk}{\F{applier\_rep}(\V{navail},~~\V{flushed\_disk})}}
+    \POST  {\PRED{disk}{\F{applier\_rep}(\C{MaxLogLen},~~\V{flushed\_disk})}}
+    \CRASH {\PRED{disk}{\F{would\_recover\_before}(\V{flushed\_disk})}}
+\end{spec}
+\caption{Specification for \memlog's \cc{applier\_apply}}
+\label{fig:spec_applier_apply}
+\end{figure}
+
+Finally, \cc{applier\_flush} extends the log using \disklog's
+\cc{disklog\_append}, whose specification is illustrated in
+\Cref{fig:spec_disklog_append}. Like before, \syslog's implementation
+guarantees that the failure case in the postcondition cannot occur, because
+no transaction larger than \cc{MaxLogLen} will be appended, and
+\cc{applier\_apply} will reset the available log space back to
+\cc{MaxLogLen} when necessary.  
+
+The two branches in \Cref{fig:spec_disklog_append}'s crash condition
+corresponds to the two cases defined by \cc{would\_recover\_either}.  In
+particular, the ``\cc{Extended}'' case also describes an unsynced log
+state: If the system crashes while updating the commit block, it will
+recover to a state either before or after \V{new\_ents} is appended.  The
+evolution of crash conditions in each logging layer further demonstrates
+that representation invariants can help in hiding lower-level details from
+the higher layers.
+
+One subtlety of \cc{disklog\_append}'s specification is that it includes a
+frame predicate $F_{\V{disk}}$.  This is because \cc{disklog\_rep} only
+describes the log region and does not cover the entire \V{disk} address
+space. This frame predicate allows \disklog's upper layer (\memlog) to
+carry its own predicate about the data region of the disk---another example
+of using separation logic to achieve modularity.
+
+\begin{figure}[htb]
+\begin{spec}
+    \SPEC  {\PROC{disklog\_append}{new\_ents}}
+    \PRE   {\PRED{disk}{$ F_{\V{disk}} * \F{disklog\_rep}
+                (\C{Synced},~\V{navail},~\V{old\_ents})$}}
+    \POST  {\PRED{disk}{%
+            $ ( \V{ret} = \true\;\AND F_{\V{disk}} * \F{disklog\_rep}
+                (\C{Synced},~\V{navail}',~\V{old\_ents \app\,new\_ents}) $ \BR
+            $ ( \V{ret} = \false \AND F_{\V{disk}} * \F{disklog\_rep}
+                (\C{Synced},~\V{navail},~\V{old\_ents}) \AND $ \BR
+            $ \qquad\qquad\qquad\;~
+              \len{\V{new\_ents}} > \V{navail}\,) $
+            }}
+    \CRASH {\PRED{disk}{%
+           $ F_{\V{disk}} * \F{disklog\_rep} 
+                (\C{Synced},~\V{navail},~\V{old\_ents}) ~~ \OR $  \BR
+           $ F_{\V{disk}} * \F{disklog\_rep}
+                (\C{Extended},~\V{old\_ents},~\V{new\_ents})$}}
+\end{spec}
+\caption{Specification for \disklog's \cc{disklog\_append}}
+\label{fig:spec_disklog_append}
+\end{figure}
+
+
+
+\subsection{Logging with checksums}
+
+The previous section mostly introduced specifications above the \disklog
+layer that implement deferred apply and group commit.  This section
+describes how to implement and formalize the log-checksum optimization
+mentioned in \Cref{sec:bkgrd:log}.  More details about the design of \sys's
+log-checksum optimization can be found in~\cite{stephanie-meng}.
+
+%Traditional write-ahead logging protocols use two write barriers in order
+%to commit a transaction.  The protocol must first write the log entries
+%to disk, and then issue a write barrier to ensure all log entries are
+%persistently stored on disk.  The protocol can then write the commit
+%block, indicating that the transaction has committed, and then issue a
+%second write barrier to ensure that the commit record is durably stored
+%before returning to the application code.  For instance, the Linux ext3
+%file system uses this logging protocol for its crash recovery.
+%
+%Write barriers are expensive, and one way to reduce the number of
+%write barriers is to rely on \emph{checksums} in the logging protocol.
+%In particular, if the commit block contains a checksum of all the
+%related log entries, it is safe to omit the write barrier between the
+%log entries and the commit block.  The reason that it is safe is that,
+%during recovery, the logging system can determine whether the log entries
+%made it to disk, by reading the log entries from disk, computing their
+%checksum, and comparing it to the checksum in the commit block.  If they
+%match, then (with overwhelming probability) the log entries are correct,
+%and the transaction can commit.  If they do not match, then the recovery
+%code aborts the transaction.  This protocol is implemented as one option
+%in the ext4 file system on Linux, and it is able to commit a transaction
+%with just one write barrier as opposed to two.
+
+\subsubsection{On-disk layout and protocol}
+\label{sec:log:layout}
+
+\disklog is responsible for managing on-disk state of transactions. The
+on-disk log that \disklog maintains internally is separated into three
+regions: the header (i.e., the commit block), descriptor, and data regions,
+shown in \Cref{fig:loglayout}. The header stores the number and checksum of
+valid blocks in the descriptor and data regions. To ensure durability after
+a crash, the header also stores the number of blocks at the time of the
+previous flush. The descriptor region stores disk-block addresses
+corresponding to block value updates, which are stored in the data region
+in the same order.  Disk-block addresses from a single \cc{append} call can
+be packed into a single descriptor block.  \disklog's specifications show
+that the packing and unpacking are sound.
+
+\begin{figure}[htb]
+    \centering
+    \includegraphics[width=\textwidth]{figs/disklog.pdf}
+    \caption{On-disk layout of \syslog}
+    \label{fig:loglayout}
+\end{figure}
+
+To truncate the log, \disklog simply sets the length equal to zero in the
+log header.  To append to the log, \disklog writes log entries and the log
+header together. To do this, \disklog first writes each entry in the
+transaction to the descriptor and data regions. Then, \disklog updates the
+\V{checksum}, \V{previous\_len}, and \V{len} fields in the log header.  The
+checksum is computed by hashing the stored checksum with the newly appended
+descriptor and data blocks.  For both appending and truncating, \disklog
+also stores the old length of the log in \V{previous\_len} field. During
+recovery, \disklog first tries to read the log from the disk according to the
+length stored in the \V{len} field, compute the checksum, and check it against
+the value stored in the \V{checksum} field. If they do not match, \disklog
+falls back to use the length stored in the \V{previous\_len} field, computes
+the checksum again, and updates the \V{checksum} and \V{len} fields to
+reflect the corrected state. The pseudocode for the \disklog protocol is
+shown in \Cref{fig:disklog}.
+
+\begin{figure}[htb]
+    \centering
+    \figcodefont
+    \input{code/log}
+    \caption{Pseudocode of \disklog layer}
+    \label{fig:disklog}
+\end{figure}
+
+
+\subsubsection{Formalizing checksums}
+
+A challenge in formalizing and verifying the checksum-based protocol lies
+in the probabilistic guarantee that it offers.  In practice, using a strong
+collision-resistant hash function (such as SHA-256) ensures that the
+probability of a collision is negligible.  Although developers assume that
+there are no hash collisions in practice, formalizing this assumption is
+difficult.  Theoretically speaking, any hash function (including a
+collision-resistant function like SHA-256) has collisions, and as a result,
+two different sets of log entries may have the same checksum.
+Consequently, stating an axiom that a hash function has no collisions is
+unsound and is equivalent to assuming that true is false.  On the other
+hand, stating an axiom that a hash function is collision-resistant requires
+reasoning about probabilities and the computational power of some
+hypothetical adversary that is attempting to find hash collisions.  
+
+An ideal hash model should allows \sys to state specifications in a natural
+way---the way that a file system developer might assume---by completely
+ignoring the possibility of hash collisions.  Otherwise, All proofs would
+have to deal with probabilistic preamble like ``with high probability,
+unless there is a hash collision, ...'', and all specification would be
+more complex (e.g., after recovery, if there weren't hash collisions during
+past crashes, one will have the correct data with high probability).
+
+\paragraph{Approach.}
+
+\syslog has a solution that is both sound and avoids reasoning about the
+probability of hash collisions.  The key idea is to treat hash collisions
+as function non-termination in the formal semantics of execution.  Recall
+from \Cref{sec:chl:model} that any procedure in \chl is composed of
+sequences of basic opcodes, such as \cc{disk\_read}, \cc{disk\_write}, etc.
+\chl provides a formal semantics for how each of these opcodes should
+execute; e.g., a disk read returns the last written value, and a crash
+non-deterministically chooses some set of outstanding writes to apply.
+
+\syslog introduces a new opcode to \chl, called \cc{hash}, which computes
+the hash value of its input.  \chl's formal semantics keep track of all
+inputs ever hashed and their corresponding hash values.  If \cc{hash} is
+presented with an input that hashes to the same result as an earlier,
+different input, then the \cc{hash} opcode enters an infinite loop and
+never returns.
+
+This formalization achieves our goals.  First, it allows \syslog to
+conclude that, if \cc{hash} returns the same hash value twice, the inputs
+must have been equal (because otherwise \cc{hash} would not have returned),
+without reasoning about probabilities.  This allows us to write
+specifications about entire file-system operations, such as \cc{rename},
+saying that \emph{if the operation returns}, then a transaction must have
+been committed.  Second, this formalization is sound, because it does not
+prohibit the possibility of hash collisions, and instead, explicitly takes
+them into account (by entering an infinite loop on a collision).
+
+At runtime, of course, the \cc{hash} opcode is implemented using a
+collision-resistant hash function (SHA-256 in our case).  This hash
+function does \emph{not} enter an infinite loop when presented with a
+colliding input and, consequently, can differ from the formal semantics of
+\cc{hash}.  However, since we know that our hash function is
+collision-resistant, we know that the possibility of finding a collision is
+negligible, and thus the possibility that the real execution semantics will
+differ from the formal one is also negligible.  Consequently, using a
+collision-resistant function for \cc{hash} at runtime allows us to capture
+the standard assumption made by developers (that hash collisions do not
+happen).
+
+\paragraph{Crash safety.}
+
+An additional challenge that arises in \syslog compared to earlier work on
+modeling hash collisions~\cite{Barthe:2014:PRV:2578855.2535847} is that the
+computer can crash at any point.  This means that, after a crash, the list
+of inputs ever hashed can be different from the list of hash inputs in
+either the pre- or the post-condition of a procedure.  However, the
+file-system recovery code must still be able to reason about the list of
+hash inputs after a crash, in order to prove that it recovers the contents
+of the on-disk log.  \syslog's solution is to prove that the list of hash
+inputs after a crash is a superset of the hash inputs from a procedure's
+precondition, which allows \syslog's write-ahead log to prove its
+correctness.
+
+
+\subsection{Log bypass}
+\label{sec:log:bypass}
+
+Writes that bypass the log still interact with \sys's write-ahead log.  If
+the file system issues a log-bypass write to block $b$, and there is an
+un-applied transaction that modified block $b$, it is important that this
+transaction does not later overwrite $b$'s contents.  Thus, log-bypass
+writes in \sys go through the log abstraction (even though they are not
+written to the write-ahead log).
+
+The \cc{dwrite} procedure, exposed by \logapi, \grouplog, and \memlog,
+checks if there was a previous logged write to the same address as the
+log-bypass write.  In \logapi, previous logged writes to the same address
+are discarded (since they have not yet committed).  In \grouplog, if there
+are any in-memory transaction writing to the same address, all of them are
+flushed to disk.  In \memlog, if the address appears in the on-disk log,
+the log is applied, so that a later log apply does not overwrite the block
+modified through log bypass.
+
+Another approach could have been to discard previously committed writes to
+any block modified via log bypass, even in the lower layers (\grouplog
+and \memlog).  However, this approach leads to the same problem that ext4
+experienced, where new file blocks can contain data from previously deleted
+files after a crash~\cite{git:469017}.  By flushing previously committed
+writes, \syslog avoids this problem.
+
+The specification of \syslog's top-level \cc{dwrite} is shown in
+\Cref{fig:log_dwrite_ok}.  It differs from the specification of logged
+write (see \Cref{fig:log_write_ok}) in three ways. First, \cc{log\_dwrite}
+writes directly to the disk; therefore, it changes not only the state of
+the current logical disk~(\V{old\_state}), but also all disks from the disk
+sequence of the transaction's starting state (\V{old\_disk\_seq}, as they
+all derive from the underlying disk state).  Second, much like the
+specification for writing to the physical disk, \cc{log\_dwrite} exposes an
+asynchronous interface, leaving the updated block in an unsynced
+state~(i.e., the block's value-set contains more than one value).
+Finally, the crash condition of \cc{log\_dwrite} says that it could recover
+into any disk from either the original or the updated disk sequence.  This
+is because \cc{log\_dwrite} internally might invoke \cc{log\_flush} to
+flush buffered transactions.
+
+\begin{figure}[htb]
+\centering
+\begin{spec}
+    \SPEC  {\PROC{log\_dwrite}{a, v}}
+    \PRE   {\PRED{disk}{\F{log\_rep}(\C{ActiveTxn}, \V{old\_disk\_seq}, \V{old\_state})}
+            \PRED{old\_state\;\,}{$F * a |-> \valuset{v_0}{vs_0}$}
+            \PRED{$\forall$i, old\_disk\_seq[i]\;\,}{$F_i * a |-> \valuset{v_i}{vs_i}$} }
+    \POST  {\PRED{disk}{\F{log\_rep}(\C{ActiveTxn}, \V{new\_disk\_seq}, \V{new\_state})}
+            \PRED{new\_state}{$F * a |-> \valuset{v}{\vsmerge{v_0}{vs_0}}$}
+            \PRED{$\forall$i, new\_disk\_seq[i]}
+                 {$F_i * a |-> \valuset{v}{\vsmerge{v_i}{vs_i}}$} }
+    \CRASH {\PRED{disk}{\F{would\_recover\_any}(\V{old\_disk\_seq}) $\OR$ \BR
+                        \F{would\_recover\_any}(\V{new\_disk\_seq})}}
+\end{spec}
+\caption{Specification for \logapi's \cc{log\_dwrite}}
+\label{fig:log_dwrite_ok}
+\end{figure}
+
+The caller of \cc{log\_dwrite} is responsible for syncing the updated block
+at the appropriate time.  If the file system is built on top of a write-through
+cache, where writes immediately go to the physical disk, the caller can
+simply use the disk write barrier (i.e., \cc{disk\_sync}) to persist the
+change.  However, \sys is built on top of a write-back cache (see
+\Cref{sec:impl}), where writes are buffered in memory until the updated
+block is evicted from the cache.
+
+\begin{figure}[htb]
+\centering
+\begin{spec}
+    \SPEC  {\PROC{log\_dsync}{a}}
+    \PRE   {\PRED{disk}{\F{log\_rep}(\C{ActiveTxn}, \V{old\_disk\_seq}, \V{old\_state})}
+            \PRED{old\_state\;\,}{$F * a |-> \valuset{v_0}{vs_0}$}
+            \PRED{$\forall$i, old\_disk\_seq[i]\;\,}{$F_i * a |-> \valuset{v_i}{vs_i}$} }
+    \POST  {\PRED{disk}{\F{log\_rep}(\C{ActiveTxn}, \V{new\_disk\_seq}, \V{new\_state})}
+            \PRED{new\_state}{$F * a |-> \vsemp{v_0}$}
+            \PRED{$\forall$i, new\_disk\_seq[i]}{$F_i * a |-> \vsemp{v_i}$} }
+    \CRASH {\PRED{disk}{\F{log\_rep}(\C{ActiveTxn}, \V{old\_disk\_seq}, \V{old\_state})}}
+\end{spec}
+\caption{Specification for \logapi's \cc{log\_dsync}}
+\label{fig:log_dsync_ok}
+\end{figure}
+
+To make sure that a block updated through \cc{log\_dwrite} is persisted on
+disk, the caller must first evict the block from the buffer cache and then
+sync the physical disk.  \syslog offers a \cc{log\_dsync} procedure that
+takes care of block syncing in the presence of deferred writes.  The
+specification of \cc{log\_dsync} is shown in \Cref{fig:log_dsync_ok}, which
+is very similar to \cc{log\_dwrite}'s specification but has a simpler crash
+condition.  To improve performance, \syslog also offers a few variants of
+\cc{log\_dsync} that allow a caller to evict a list of blocks from the
+buffer cache but only issue a single disk sync at the end. \sys uses
+\cc{log\_dsync} and its variants to implement \cc{fsync} and
+\cc{fdatasync}.
+
+Because log-bypass writes interact subtly with logged writes, this poses
+challenges at the file-system level, which uses logged writes to update the
+metadata and log-bypass writes to change a file's data.  For example, to
+guarantee crash safety, bypassing the log for file data requires that disk
+blocks are not reused until the log is flushed to disk.  We discuss how to
+address this challenge in the next chapter.
+
+

@@ -1,0 +1,16 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{gitinfo}[2011/02/19 v0.1]
+
+\newif\ifgitinfo\gitinfotrue
+\DeclareOption{draft}{\gitinfotrue}
+\DeclareOption{final}{\gitinfofalse}
+\DeclareOption{proof}{\gitinfotrue}
+\ProcessOptions\relax
+
+\RequirePackage{fancyhdr}
+
+\ifgitinfo
+\input{gitinfo.tex}
+
+\fancyfoot[R]{{\bf Revision:} \gitid}
+\fi

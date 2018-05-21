@@ -1,0 +1,88 @@
+\renewcommand{\ttdefault}{pxtt}
+
+\newcommand{\sys}{FSCQ\@\xspace}
+\newcommand{\syslog}{\mbox{\textsc{FscqLog}}\xspace}
+\newcommand{\chl}{CHL\@\xspace}
+
+\newcommand{\URL}{\url}
+\newcommand{\cc}[1]{\mbox{\code{#1}}}
+
+\newcommand{\defeq}{\mathrel{\Coloneqq}}
+\newcommand{\term}[1]{\left<\,\mathrm{#1}\,\right>}
+\newcommand{\prog}[1]{\ifmmode\mathbb{#1}\else$\mathbb{#1}$\fi}
+\newcommand{\dom}{\mathop{\mathrm{dom}}\,}
+\newcommand{\empset}{\varnothing}
+\newcommand{\emp}{\mathbf{emp}}
+\newcommand{\true}{\mathbf{true}}
+\newcommand{\false}{\mathbf{false}}
+\newcommand{\ptsto}{\mathrel{\mapsto}}
+\newcommand{\subptsto}{\mathrel{\rightarrowtail}}
+\newcommand{\sepstar}{~\star~}
+\newcommand{\AND}{\ \wedge\ }
+\newcommand{\OR}{\ \vee\ }
+\newcommand{\Iff}{\ \mathrm{iff}\quad}
+\newcommand{\satisfy}{\;\models\;}
+\newcommand{\pair}[2]{\langle \mathit{#1}, ~\mathit{#2} \rangle}
+\newcommand{\valuset}[2]{\langle #1, ~#2 \rangle}
+\newcommand{\vsemp}[1]{\langle #1, ~\empset\rangle}
+\newcommand{\vsmerge}[2]{\{#1\} \cup \mathit{#2}}
+\newcommand{\app}{+\!\!+}
+\newcommand{\cons}[2]{\mathit{#2}\app\,\{\mathit{#1}\}}
+\newcommand{\len}[1]{\|\,#1\,\|}
+
+\mathlig{|->}{\ptsto}
+\mathlig{|+>}{\subptsto}
+\mathlig{*}{\sepstar}
+\mathlig{|=}{\satisfy}
+
+
+% spec formatting
+
+\newcounter{argcount}\newcounter{totalargcount}%
+\newcommand{\specargs}[1]{%
+  \setcounter{totalargcount}{0}% Reset total count
+  \renewcommand*{\do}[1]{\stepcounter{totalargcount}}% Reconfigure count
+  \docsvlist{#1}% Count number of items
+  \setcounter{argcount}{0}% Reset current item count
+  \renewcommand*{\do}[1]{% Reconfigure item \do
+    \stepcounter{argcount}% Next item
+    \textit{##1}%
+    \ifnum\value{argcount}<\value{totalargcount},~\fi% Print item
+  }%
+  (\docsvlist{#1})% Process list
+}
+
+\newcommand{\mlcell}[2][t]{\begin{tabular}[#1]{@{}l@{}}#2\end{tabular}}
+\newcommand{\spechdr}[1]{\textsc{#1}}
+\newcommand{\specitem}[2]{\spechdr{#1} & \mlcell{#2} \\ }
+\newcommand{\specns}[1]{\textbf{#1}}
+\newcommand{\specpred}[3][]{%
+    \gdef\specpredhdr{\specns{#2}~$\,\models~$}%
+    \ifx\\#1\\%
+        \gdef\BR{\\\phantom{\specpredhdr}}%
+    \else \gdef\BR{\\#1} \fi%
+    \specpredhdr#3 \\
+}
+\newcommand{\specrec}{\Join}
+\newcommand{\textpred}[2]{\specns{#1}~$\,\models\;$#2}
+\newcommand{\V}[1]{\ifmmode\mathit{#1}\else\textit{#1}\fi} % vars
+\newcommand{\F}[1]{\code{#1}}  % function
+\newcommand{\C}[1]{\code{#1}}  % constants
+\newcommand{\latest}[1]{\V{#1}.\ifmmode\mathrm{latest}\else{latest}\fi}
+\newcommand{\PROC}[2]{\code{#1}\,\specargs{#2}}
+\newcommand{\SPEC}[2][]{\specitem{SPEC}{%
+    #2~%
+    \ifx\\#1\\ {}%
+    \else $~~\specrec~~$\PROC{#1}{} \fi
+}}
+\newcommand{\PRE}[1]{\specitem{PRE}{#1}}
+\newcommand{\POST}[1]{\specitem{POST}{#1}}
+\newcommand{\CRASH}[1]{\specitem{CRASH}{#1}}
+\newcommand{\PRED}[3][]{\specpred[#1]{#2}{#3}}
+\newcommand{\specfont}{\fontsize{10.5}{14}\selectfont}
+\newenvironment{spec}
+{\specfont
+\begin{tabular}{@{}l@{~ ~}l@{}}}
+{\end{tabular}}
+
+

@@ -1,0 +1,58 @@
+{
+    "fscq-log": {
+        "avgsync": 3.507042253521127,
+        "cycles": 16801914187.0,
+        "avgwrite": 28.788732394366196,
+        "writeops": 804,
+        "writes": 2044,
+        "messages": 71.0,
+        "syncs": 249,
+        "messages/sec": 14.0,
+        "secs": 5.040712,
+        "tput": 14.085311757545362,
+        "time": 14.199188732394367,
+        "cycles/message": 236646678.0
+    },
+    "fscq-bypass": {
+        "avgsync": 9.8,
+        "cycles": 16928123801.0,
+        "avgwrite": 49.975,
+        "writeops": 1063,
+        "writes": 1999,
+        "messages": 40.0,
+        "syncs": 392,
+        "messages/sec": 7.0,
+        "secs": 5.078577,
+        "tput": 7.876222020459668,
+        "time": 25.392885,
+        "cycles/message": 423203095.0
+    },
+    "ext4-async-bypass": {
+        "avgsync": 7.467741935483871,
+        "cycles": 16891468432.0,
+        "avgwrite": 38.03225806451613,
+        "writeops": 596,
+        "writes": 2358,
+        "messages": 62.0,
+        "syncs": 463,
+        "messages/sec": 12.0,
+        "secs": 5.067533,
+        "tput": 12.234750123975513,
+        "time": 16.34688064516129,
+        "cycles/message": 272443039.0
+    },
+    "ext4-async-log": {
+        "avgsync": 3.6527777777777777,
+        "cycles": 16718984514.0,
+        "avgwrite": 38.333333333333336,
+        "writeops": 564,
+        "writes": 5520,
+        "messages": 144.0,
+        "syncs": 526,
+        "messages/sec": 28.0,
+        "secs": 5.015836,
+        "tput": 28.709072625181523,
+        "time": 6.96643888888889,
+        "cycles/message": 116104059.0
+    }
+}

@@ -1,0 +1,7 @@
+\begin{BVerbatim}[commandchars=\\\{\}]
+\PY{k+kn}{Definition} \PY{n}{inode\PYZus{}type} \PY{o}{:} \PY{n+nn}{Rec}\PY{p}{.}\PY{n}{type} \PY{o}{:=} \PY{n+nn}{Rec}\PY{p}{.}\PY{n+nc}{RecF} \PY{o}{(}\PY{o}{[}
+  \PY{o}{(}\PY{l+s+s2}{\PYZdq{}}\PY{l+s+s2}{len}\PY{l+s+s2}{\PYZdq{}}\PY{o}{,}  \PY{n+nn}{Rec}\PY{p}{.}\PY{n+nc}{WordF} \PY{l+m+mi}{64}\PY{o}{)}\PY{o}{;}     \PY{c}{(*}\PY{c}{ number of blocks }\PY{c}{*)}
+  \PY{o}{(}\PY{l+s+s2}{\PYZdq{}}\PY{l+s+s2}{attrs}\PY{l+s+s2}{\PYZdq{}}\PY{o}{,} \PY{n}{iattr\PYZus{}type}\PY{o}{)}\PY{o}{;}      \PY{c}{(*}\PY{c}{ file attributes, another record type }\PY{c}{*)}
+  \PY{o}{(}\PY{l+s+s2}{\PYZdq{}}\PY{l+s+s2}{indptr}\PY{l+s+s2}{\PYZdq{}}\PY{o}{,} \PY{n+nn}{Rec}\PY{p}{.}\PY{n+nc}{WordF} \PY{l+m+mi}{64}\PY{o}{)}\PY{o}{;}   \PY{c}{(*}\PY{c}{ indirect pointer }\PY{c}{*)}
+  \PY{o}{(}\PY{l+s+s2}{\PYZdq{}}\PY{l+s+s2}{blocks}\PY{l+s+s2}{\PYZdq{}}\PY{o}{,} \PY{n+nn}{Rec}\PY{p}{.}\PY{n+nc}{ArrayF} \PY{l+m+mi}{9} \PY{o}{(}\PY{n+nn}{Rec}\PY{p}{.}\PY{n+nc}{WordF} \PY{l+m+mi}{64}\PY{o}{)}\PY{o}{)}\PY{o}{]}\PY{o}{)}\PY{o}{.} \PY{c}{(*}\PY{c}{ direct block pointers }\PY{c}{*)}
+\end{BVerbatim}
