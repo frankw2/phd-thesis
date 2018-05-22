@@ -1,0 +1,99 @@
+\section{Introduction}
+\label{chap:intro}
+
+This dissertation presents two practical, secure
+systems, Veil and Splinter, which protect against
+certain data leakage that happens when a user
+accesses a web service. The rest of this
+chapter will motivate this problem and 
+briefly describe Veil and Splinter.
+
+\subsection{Motivation}
+Consumers are increasing their usage of web services. Whenever
+users interact with these applications, the web service collects
+user data both directly and indirectly. This data can contain sensitive 
+information about a user, such as their behavior, personal facts,
+and location. These data leaks are happening with even greater
+frequency and as web systems have become more complex, the number
+of channels where data can leak grows even more. Unfortunately,
+many times, these data leakages happen because web services
+lack practical, secure mechanisms to protect user data. 
+
+Many systems~\cite{mylar, cryptdb, opaque} 
+have been built to prevent
+data leakage from the server, but
+the focus of this dissertation is on systems
+that minimize data leakage on the client (Veil), specifically
+the browser, and that protect user in queries (Splinter).
+In the section below, we provide an overview of Veil and Splinter.
+
+\subsection{Our systems}
+
+\subsubsection{Veil: Private Browsing Semantics without Browser-side Assistance}
+All popular web browsers offer a ``private browsing
+mode.'' After a private session terminates, the
+browser is supposed to remove client-side
+evidence that the session occurred. Unfortunately,
+browsers still leak information through the file
+system, the browser cache, the DNS cache, and
+on-disk reflections of RAM such as the swap file.
+
+Veil is a new deployment framework that allows
+web developers to prevent these information leaks,
+or at least reduce their likelihood. Veil leverages
+the fact that, even though developers do not control the
+client-side browser implementation, developers do
+control 1) the content that is sent to those browsers,
+and 2) the servers which deliver that content.
+Veil web sites collectively store their content
+on Veil's \emph{blinding servers} instead
+of on individual, site-specific servers. To publish
+a new page, developers pass their HTML, CSS, and
+JavaScript files to Veil's compiler; the compiler
+transforms the URLs in the content so that, when
+the page loads on a user's browser, URLs are derived
+from a secret user key. The blinding service and
+the Veil page exchange encrypted
+data that is also protected by the user's key. The
+result is that Veil pages can safely store encrypted
+content in the browser cache; furthermore, the URLs exposed
+to system interfaces like the DNS cache are
+unintelligible to attackers who do not possess
+the user's key. To protect against post-session
+inspection of swap file artifacts, Veil uses
+heap walking (which minimizes the likelihood that
+secret data is paged out), content mutation (which
+garbles in-memory artifacts if they do get swapped out),
+and DOM hiding (which prevents the browser from
+learning site-specific HTML, CSS, and JavaScript
+content in the first place). Veil pages load on unmodified
+commodity browsers, allowing developers to provide
+stronger semantics for private browsing without forcing
+users to install or reconfigure their machines. Veil
+provides these guarantees even if the user does not
+visit a page using a browser's native privacy mode;
+indeed, Veil's protections are \emph{stronger}
+than what the browser alone can provide.
+
+\subsubsection{Splinter: Practical, Private Web Application Queries}
+
+Many online services let users query datasets such as maps, flight prices, patents,
+and medical information. The datasets themselves do not contain sensitive information,
+but unfortunately, users' queries on these datasets reveal highly
+sensitive information that can compromise users' privacy. 
+This paper presents Splinter, a system that protects users' queries and
+scales to realistic applications.
+A user splits her query into multiple parts and sends each part 
+to a different provider that holds a copy of the data.
+As long as any one of the providers is honest and does not collude with the
+others, the providers cannot determine the query.
+Splinter uses and extends a new cryptographic primitive called Function Secret Sharing (FSS) that makes it up to an order of magnitude more efficient than prior systems based on Private Information Retrieval and garbled circuits.
+We develop protocols extending FSS to new types of queries, such as MAX and TOPK queries. 
+We also provide an optimized implementation of FSS using AES-NI instructions and multicores.
+Splinter achieves end-to-end latencies below 1.6 seconds for realistic workloads including a Yelp clone, flight search, and map routing.
+
+\subsubsection{Dissertation Roadmap}
+
+The dissertation will be organization like the following: 
+Chapter~\ref{chap:veil} and Chapter~\ref{chap:splinter} will motivate and describe Veil
+and Splinter respectively. Chapter~\ref{chap:concl} will describe future work.
