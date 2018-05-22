@@ -153,7 +153,7 @@ private browsing.
 % graphical table generator! I used this one for the table
 % below:
 %        http://www.tablesgenerator.com/#
-\begin{table*}[t!]
+\begin{table*}
 \scalebox{0.58}{		
 	\centering
 	\begin{tabular}{lllll}
@@ -165,7 +165,6 @@ private browsing.
 		\multicolumn{1}{|l|}{Veil with DOM hiding}                                                                                                   & \multicolumn{1}{l|}{No}                                                                 & \multicolumn{1}{l|}{No (blinding servers)}                                                                                   & \multicolumn{1}{l|}{No}                                                           & \multicolumn{1}{l|}{Remotely processed}                             \\ \hline
 	\end{tabular}
 }
-	\vspace{3mm}
 	\caption{A comparison between Veil's two browsing modes, regular incognito browsing,
 		and regular browsing that does not use incognito mode.}
 	\label{t:modeTable}
@@ -343,7 +342,7 @@ scope of this paper.
 \subsection{Design}
 \label{sec:design}
 
-\begin{figure*}[t!]
+\begin{figure*}
 	\centering
 	\includegraphics[width=\textwidth]{veil-figs/arch_small_cropped}
 	\caption{The Veil architecture (cryptographic operations omitted for clarity).}
@@ -375,9 +374,9 @@ describe how Veil handles more complex pages that
 dynamically fetch and generate new content.
 
 
-\subsubsubsection{The Veil Compiler and veilFetch()}
+\subsubsection{The Veil Compiler and veilFetch()}
 \label{sec:compiler}
-\vspace{-1mm}
+
 The compiler processes the HTML in our example page (Figure~1),
 and finds references to three external objects (i.e.,
 the CSS file, the JavaScript file, and the image).
@@ -468,7 +467,7 @@ data. This causes the browser to load the
 image. \texttt{veilFetch()} uses similar
 techniques to reinflate other content types.
 
-\begin{figure}[t]
+\begin{figure}
 	\centering
 	\includegraphics{veil-figs/fetchProtocol_cropped}
 	\caption{The \texttt{veilFetch()} protocol.}
@@ -476,7 +475,7 @@ techniques to reinflate other content types.
 \end{figure}
 
 \begin{center}
-\begin{figure}[t]
+\begin{figure}
 		\begin{BVerbatim}
 		    {"img_type": "jpeg",
 		    "dataURI": "ab52f...",
@@ -686,7 +685,7 @@ of non-personalized JavaScript to find the local
 cookie and then generate a request for dynamic
 content (\S\ref{sec:dynamic}).
 
-\subsubsubsection{The Bootstrap Page}
+\subsubsection{The Bootstrap Page}
 \label{sec:bootstrap}
 Before the user can visit any Veil sites, she
 must perform a one-time initialization step
@@ -731,7 +730,7 @@ the user clicks a link, the page will fetch the
 relevant content via a blinded URL, and then deserialize
 and evaluate that content as described above.
 
-\subsubsubsection{Protecting RAM Artifacts}
+\subsubsection{Protecting RAM Artifacts}
 \label{sec:heapWalk}
 
 As a Veil page creates new JavaScript objects,
@@ -832,7 +831,7 @@ symmetric key. This prevents those secrets
 from paging out and allowing an attacker
 to decrypt swapped out network buffers.
 
-\subsubsubsection{Mutation Techniques}
+\subsubsection{Mutation Techniques}
 \label{sec:mutation}
 Veil's main protection mechanism for RAM
 artifacts is heap walking, and we show in
@@ -982,7 +981,7 @@ from the computer vision community~\cite{biggio11}.\\
 % us to thwart forensics which looks at browser memory
 % consumption to fingerprint pages~\cite{memento}.
 
-\subsubsubsection{Dynamic Content}
+\subsubsection{Dynamic Content}
 \label{sec:dynamic}
 
 At first glance, Veil's compile-time binding of
@@ -1021,7 +1020,7 @@ generating a few metadata fields, taking roughly
 75 ms. Content providers can compile multiple
 dynamic objects in parallel.
 
-\subsubsubsection{DOM Hiding}
+\subsubsection{DOM Hiding}
 \label{sec:domHiding}
 
 Heap walking reduces the likelihood that in-memory browser
@@ -1053,9 +1052,9 @@ a synchronous wide-area latency. For some Veil sites,
 this trade-off will be acceptable. We characterize the
 additional interactive latency in Section~\ref{sec:dhEval}.
 
-\begin{figure}[t!]
+\begin{figure}
 	\centering
-	\includegraphics{veil-figs/domHiding.pdf}
+	\includegraphics[width=\textwidth]{veil-figs/domHiding.pdf}
 	\caption{With DOM hiding, the client-side remoting stub sends
 		GUI events to the content provider, and receives bitmaps
 		representing new page states. The page's raw HTML, CSS,
@@ -1167,3 +1166,869 @@ disable this feature.
 %timing is the same. Veil does not specifically address
 %this attack, but Veil is compatible with solutions
 %like the \texttt{mod\_timepad} Apache module~\cite{serverTimingAttacks}.
+
+\subsection{Porting Legacy Applications}
+\label{sec:porting}
+
+In this section, we describe how Veil helps developers
+to port legacy web pages to the Veil framework. In
+particular, we provide case studies which demonstrate
+how Veil's compiler and runtime library can identify
+unblinded fetches and, in some cases, automatically
+transform those fetches into blinded ones.\\
+
+\noindent
+{\bf Raw XMLHttpRequests:} Veil's compiler traverses
+a statically defined HTML tree, converting raw URLs
+into Veil hash pointers. However, a page's JavaScript
+code can use \texttt{XMLHttpRequests} to dynamically
+fetch new content. Veil's static HTML compiler does
+not interpose on such fetches, so they will generate
+unblinded transfers that pollute the client's DNS cache
+and browser cache.
+
+In debugging mode, Veil's client library shims the
+JavaScript runtime~\cite{mugshot} and interposes on
+the \texttt{XMLHttpRequest} interface. This allows
+Veil to inspect the URLs in \texttt{XMLHttpRequests}
+before the associated HTTP fetches are sent over the
+network. Veil drops unblinded requests and writes the
+associated URLs to a log. A web developer can then
+examine this log and determine how to port the URLs.
+
+For static content, one porting solution is to leverage
+Veil's \textit{AJAX maps}. Once the debugging client
+library has identified a page's raw \texttt{XMLHttpRequest}
+URLs, the library sends those URLs to Veil's HTML
+compiler. The compiler automatically fetches the associated
+objects and uploads them to the object servers. Additionally,
+when the compiler rewrites the HTML, it injects
+JavaScript code at the beginning of the HTML which maps
+the raw \texttt{XMLHttpRequest} URLs to the hash names
+of the associated objects. Later, when the page is
+executed by real users, Veil's shimmed \texttt{XMLHttpRequests}
+use the AJAX map to convert raw URLs to blinded references.
+Veil will drop requests that are not mentioned in
+the translation map. This approach is complete from
+the security perspective, since all unblinded \texttt{XMLHttpRequests}
+will be dropped. However, for this approach to please users
+(who do not want \textit{any} requests to drop),
+Veil developers should use testing tools with good
+coverage~\cite{monkeytest,clickmonkey,sahi} to ensure
+that all of a page's \texttt{XMLHttpRequest} URLs are
+mapped.
+
+AJAX maps are unnecessary for native Veil pages
+which always generate blinded \texttt{XMLHttpRequests}.
+However, URL validation via \texttt{XMLHttpRequest}
+shimming is useful when developers must deal with
+complex legacy libraries.\\
+
+\noindent
+{\bf Dynamic tag generation:} A legacy page can generate
+unblinded fetches by dynamically creating new DOM nodes
+that contain raw URLs in \texttt{src} attributes. For
+example, using \texttt{document.createElement()}, a page
+can inject a new \texttt{<img>} tag into its HTML\@. A
+page can also write to the \texttt{innerHTML} property
+of a preexisting DOM node, creating a new HTML subtree
+that is attached to the preexisting node. Neither type of
+tag creation will be captured by \texttt{XMLHttpRequest}
+shimming.
+
+\texttt{XMLHttpRequest} shimming is a specific example
+of a more general technique called DOM virtualization.
+If desired, the entire DOM interface can be
+virtualized~\cite{psj,treehouse,jigsaw}, allowing Veil to interpose
+on all mechanisms for dynamic tag creation. However,
+full DOM virtualization adds non-trivial performance
+overhead---the native DOM implementation is provided by
+the browser in fast C++ code, but a virtualized DOM is
+implemented by the application in comparatively slow JavaScript
+code. Furthermore, the full DOM interface is much more
+complex than the narrow \texttt{XMLHttpRequest} interface. 
+
+Our current implementation of Veil supports
+\texttt{XMLHttpRequest} shimming, but not full DOM
+virtualization. We leave the integration of Veil with
+a full virtualization system~\cite{treehouseGit} as
+future work.\\
+
+\noindent
+{\bf Unblinded links in CSS:} CSS files can directly
+reference image objects using the \texttt{url()}
+statement, e.g., \texttt{body\{background: url(`x.jpg')\}}.
+After the Veil compiler processes HTML files, it
+examines the associated CSS files and replaces raw
+image links with inline data URLs. Thus, when the
+Veil page loads a post-processed CSS file, the image
+data will be contained within the CSS itself, and will
+not require network fetches.\\
+
+\noindent
+{\bf Angular.js:} Angular~\cite{angular} is a popular
+JavaScript framework that provides model-view-controller
+semantics for web applications. Angular uses a
+declarative model to express data bindings. For
+example, the \texttt{\{\{\}\}} operator is used to embed
+live views of the controller into HTML\@. The HTML
+snippet \texttt{<img src=\{\{controller.x\}\}/>} instructs
+Angular to dynamically update the content of the
+\texttt{<img>} whenever the JavaScript value
+\texttt{controller.x} changes. Many other popular
+frameworks define a similar templating mechanism~\cite{backbone,kendo,ember}.
+
+The \texttt{\{\{\}\}} operator is not part of the official
+HTML grammar. To implement \texttt{\{\{\}\}} and other
+kinds of data binding, Angular uses a dynamic DOM
+node compiler. This compiler is a JavaScript file
+that runs at the end of the page load, when the initial DOM
+tree has been assembled. The compiler locates special
+Angular directives like \texttt{\{\{\}\}}, and replaces
+them with new JavaScript code and new DOM nodes
+that implement the data binding protocol.
+
+Angular allows URLs to contain embedded \texttt{\{\{\}\}}
+expressions. Since these URLs are not resolved until
+runtime, Veil's static compiler cannot directly
+replace those URLs with blinded ones. However, Veil
+can rewrite Angular directives in a way that passes
+control to Veil code whenever a data binding changes.
+In the previous \texttt{<img>} example, Veil rewrites
+the tag as follows:
+
+\begin{verbatim}
+<img src="0" alt={{controller.x}}/>
+\end{verbatim}
+The \texttt{src} attribute of the image is set to
+a network path which is known to be nonexistent
+(but whose URL does not leak private information).
+When the page tries to load the image, the load
+failure will invoke a custom \texttt{onerror}
+handler that Veil has attached to the \texttt{window}
+object. That handler will read the value of the
+\texttt{alt} attribute, which will contain the
+dynamic value of \texttt{controller.x}. Veil
+will then issue a blinded fetch for the associated
+image. In parallel, Veil also sets an Angular
+\texttt{\$watch()} statement to detect future
+changes in \texttt{\{\{controller.x\}\}}; when a
+change occurs, Veil reads the new value, and then
+blindly fetches and updates the image as before.
+This basic approach is compatible with the template
+semantics of other popular JavaScript
+frameworks~\cite{backbone,kendo,ember}.
+
+If dynamic Angular URLs can be drawn from an arbitrarily
+large set, Veil uses the ``forward'' message type
+from Section~\ref{sec:discussion} to bind the
+raw URL to a blinded one. If the URL is drawn
+from a finite set, the compiler can upload the
+associated objects to the blinding service,
+and then inject the page with a blinding
+map that translates resolved Angular URLs
+to the associated hash names. The blinding
+service mutates that table in the same way
+that it mutates the hash names passed to
+\texttt{veilFetch()}.
+
+\subsection{Implementation}
+\label{sec:impl}
+
+Our Veil prototype consists of a compiler,
+a blinding server, a GUI proxy, a bootstrap page,
+and a client-side JavaScript library that
+implements \texttt{veilFetch{}()}
+%, the \texttt{v\_str} object,
+and other parts of the Veil runtime.
+
+We implemented the compiler and the blinding
+server in Python. The compiler uses
+BeautifulSoup~\cite{beautifulSoup} to
+parse and mutate HTML; the compiler also
+uses the Esprima/Escodegen tool chain~\cite{esprima,escodegen}
+to transform JavaScript code into ASTs, and
+to transform the mutated ASTs back into
+JavaScript. To implement cryptography, we use the
+PyCrypto library~\cite{pyCrypto}
+in the blinding server, and the native
+Chrome WebCrypto API~\cite{webCrypto} 
+in the Veil JavaScript library. We 
+use OpenCV~\cite{opencv} to perform
+image mutation on the blinding server.
+
+To implement DOM hiding, we used Chrome 
+running in headless mode as the browser
+used by the content provider's GUI proxy.
+The GUI proxy was written in Python, and
+used Selenium~\cite{selenium} to take
+screenshots and generate synthetic GUI
+events within the headless browser.
+
+\subsection{Evaluation}
+\label{sec:eval}
+
+In this section, we evaluate Veil's raw
+performance, and its ability to safeguard
+user privacy. Using forensic tools and
+manual analysis, we find that blinded
+references and encrypted objects are
+sufficient to prevent information leakage
+through the browser cache and name-based
+interfaces like the DNS cache. We show
+that Veil's heap walking techniques are
+effective at preventing secrets from paging
+out unless system-wide memory pressure is
+very high. We also demonstrate that the performance
+of our Veil's prototype is acceptable, with
+page load slowdowns of 1.2x--3.25x.
+
+\begin{figure*}
+	\centering
+	\begin{tabular}{lr}
+		\toprule
+		\bf Operation & \bf Speed \\
+		\midrule
+		Generate an AES key and encrypt it with RSA public key (2048 bit)  & 0.75 ms \\
+		% Throughtput for verifying 2048 bit RSA PKCS 1 signature on index file & 215 MB/s \\
+		Encrypt 64 character hash (blinded reference) & 0.16 ms \\
+		Throughput for decryption using AES-CTR & 520 MB/s \\
+		Throughput for verifying SHA256 hash of file & 220 MB/s \\
+		\bottomrule
+	\end{tabular}
+	\caption{Overhead for client-side JavaScript cryptography using the WebCrypto API~\cite{webCrypto}.}
+	\label{fig:cryptoCost}
+\end{figure*}
+
+All performance tests ran on a machine with
+a 2 GHz Intel Core i7 CPU with 8GB of RAM.
+Unless otherwise specified, those tests ran in
+the Chrome browser, and we ran each experiment
+100 times and measured the average. We configured
+Veil to use 2048-bit RSA and 128-bit AES in CTR
+mode. The phrase ``standard Veil mode''
+corresponds to non-DOM hiding mode.
+
+\subsubsection{Performance Microbenchmarks}
+\label{sec:microbench}
+
+Veil uses cryptography to implement blind references
+and protect the data that it places in client-side storage.
+Figure~5 depicts the costs %!!!jwm: For some reason, doing a ~\ref{fig:cryptoCost} doesn't work!
+for those operations. Before a user can load a Veil
+page, she must generate an AES key and encrypt it
+with the blinding service's RSA key. This one time
+cost is 0.75 ms. The remaining three rows in Figure~5
+depict cryptographic %!!!jwm: For some reason, doing a ~\ref{fig:cryptoCost} doesn't work!
+overheads that Veil incurs during a page load.
+\begin{itemize}
+	%    \item After the bootstrap page downloads a
+	%          top-level HTML file, the bootstrapper
+	%          must verify that the file is signed by
+	%          the publisher. This operation proceeds
+	%          at 215 MB/s; so, for an 100 KB HTML file,
+	%          Veil would require 0.5 ms to validate
+	%          the signature.
+	\item For \texttt{veilFetch()} to generate a
+	blinded reference, it must encrypt a
+	hash value with the user's AES key. This
+	operation took 0.16 ms.
+	\item When \texttt{veilFetch()} receives a
+	response, it must decrypt that response
+	with the AES key. That operation proceeds
+	at 520 MB/s. For example, decrypting a
+	300 KB image would require 0.6 ms.
+	\item \texttt{veilFetch()} also validates the
+	hash of the downloaded object. This
+	proceeds at 220 MB/s, requiring 1.3 ms
+	for a 300 KB image.
+\end{itemize}
+Figure~\ref{fig:cryptoCostServer} depicts the
+cryptography overheads on the server-side of
+the protocol. End-to-end, fetching a 300 KB
+object incurs roughly 10 ms of cryptographic
+overhead. 
+
+\begin{figure}
+	\centering
+	\begin{tabular}{lr}
+		\toprule
+		\bf Operation & \bf Speed \\
+		\midrule
+		Decrypt AES key (2048 bit RSA)  & \phantom{0}3.1 ms \\
+		Decrypt 64 char hash (blinded reference) & 0.04 ms \\
+		Throughput for encryption using AES-CTR & 62 MB/s \\
+		\bottomrule
+	\end{tabular}
+	\caption{Overhead for server-side operations using PyCrypto~\cite{pyCrypto}.}
+	\label{fig:cryptoCostServer}
+\end{figure}
+
+\subsubsection{Performance Macrobenchmarks: Standard Veil Mode}
+\label{sec:macrobench}
+
+To measure the increase in page load
+time that Veil imposes, we ported six sites
+to the Veil framework.  \textbf{Washington Post}
+is the biggest site that we ported, and contains
+large amounts of text, images, and JavaScript
+files. \textbf{Imgur} is a popular image-sharing
+site; compared to the other test sites, it has
+many images but less text. \textbf{Woot!} is an
+e-commerce site that has a large amount of text
+and images, but comparatively few scripts.
+\textbf{Piechopper} is a highly dynamic site that
+uses Angular (\S\ref{sec:porting}). Piechopper is
+script-and-text heavy, but has few images.
+\textbf{University} represents a university's
+website. This site is the smallest
+one that we tested, although it uses CSS with raw
+URLs that Veil must blind (\S\ref{sec:porting}).
+\textbf{Google} represents the results page for
+the search term ``javascript.''  Most of that page's
+JavaScript and CSS objects are inlined into
+the HTML, meaning that they do not require
+network fetches. 
+
+To port a preexisting site to Veil, we had the
+compiler download the top-level HTML file and
+extract the URLs which referenced external objects like
+images. The compiler downloaded those objects from
+the relevant servers. After calculating hashes
+for those objects (and converting raw URLs into
+blinded ones), the compiler uploaded the objects
+to the blinding server. Since preexisting sites
+were not designed with Veil in mind, they
+occasionally fetched content dynamically, e.g.,
+via unblinded \texttt{<img>} tags generated by
+JavaScript at runtime. For sites like this, we
+observed which objects were dynamically fetched,
+and then manually handed them to the compiler
+for processing; we also manually rewrote the
+object fetch code to refer to the compiler-generated
+object names. Native Veil pages would invoke
+the Veil runtime library to dynamically fetch
+such content, avoiding the need for manual
+rewriting.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth]{veil-figs/perf_graph.pdf}
+	\caption{Page load times for each website: regular; with Veil (but no cryptography); with Veil (and using cryptography).}
+	\label{fig:loadTime}
+\end{figure}
+
+\noindent
+\textbf{Page load time:}
+Figure~\ref{fig:loadTime} depicts the load times
+for three versions of each site: the regular version
+of the site, a Veil port that does not perform
+cryptography, and a Veil port with cryptography
+enabled. The regular versions of a page were loaded
+from a localhost webserver, whereas the Veil pages
+were loaded from a localhost blinding server. This setup
+isolated the overhead of cryptography and content
+mutation.
+
+As shown in Figure~\ref{fig:loadTime}, page loads using Veil with
+no cryptography were 1.25x--2x slower. This is mostly
+due to extra computational overhead on the client.
+For example, parsing overheads increased because,
+as we quantify below, mutated objects were larger than
+the baseline objects; for images, the browser also
+had to Base64-decode the bitmaps before displaying
+them.
+%jwm: The below is no longer true, since we've
+%     made the jump to asynchronous WebCrypto.
+%Also note that \texttt{veilFetch()} downloads
+%content synchronously, and that script tags
+%halt the parsing process; since Veil replaces
+%all image and CSS tags with script tags, this
+%limits the browser's ability to continue parsing
+%while previously visited tags are loading their
+%content.
+Veil with cryptography added another slowdown factor
+of 1.1x--1.63x, with higher penalties for pages
+with many objects (regardless of their type). The
+end-to-end slowdown for the full Veil system
+was 1.25x--3.25x. Note that these slowdowns were for
+browsers with cold caches; 
+Veil's overhead would
+decrease with caching, since server-side
+cryptography could be avoided. Also note that
+the University site was a challenging case for
+Veil, because the site was small in absolute size,
+but has many small images. Thus,
+Veil's per-blinded-reference cryptographic
+overheads (see Figures~5 and~\ref{fig:cryptoCostServer}) %!!!jwm: See above re: broken fig command.
+were paid more frequently. A Veil-optimized
+version of the site would use image spriting~\cite{spriting}
+to combine multiple small images into a single,
+larger one.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth]{veil-figs/size_graph.pdf}
+	\caption{Size increases for Veil's mutated objects.}
+	\label{fig:mutateSize}
+\end{figure}
+
+\noindent
+\textbf{Object growth:}
+Figure~\ref{fig:mutateSize} shows how object sizes grew
+after post-processing by Veil. Images experienced
+two sources of size expansion: mutation and Base64
+encoding. Base64 encoding resulted in a 1.33x size
+increase. Our Veil prototype implements mutation via
+the addition of Gaussian noise, with the resulting
+size increases dependent on the image format. PNG
+is lossless, so the addition of noise generated
+a 10x size increase. In contrast, JPG is a lossy
+format, so noise injection resulted in less than
+a 2x size increase. The Piechopper and Google pages
+contained many PNGs, and thus suffered from worse
+image expansion than the other test pages.
+
+As shown in Figure~\ref{fig:mutateSize}, mutated
+JavaScript files typically remained the same size,
+or became somewhat smaller---mutation adds source
+code, but Veil passes the mutated code through
+a minifier which removes extraneous whitespace
+and rewrites variable names to be shorter. HTML
+suffered from larger size increases, because
+mutation tricks like random HTML entity encoding
+strictly increase the number of characters in the
+HTML.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth]{veil-figs/scalability_mit.pdf}
+	\caption{Scalability comparison between a blinding server
+		and a regular web server.}
+	\label{fig:scalability}
+\end{figure}
+
+\noindent
+\textbf{Server-side scalability:}
+Figure~\ref{fig:scalability} shows the HTTP-level
+request throughput of a Veil blinding server,
+compared to the baseline performance of a blinding
+server that performed none of Veil's added functionality
+(and thus acted as a normal web server).
+% The client and the servers were on the same machine, but
+% client/server traffic used an emulated link
+% with 25 ms latency and 500 Mbit/s of download
+% bandwidth, to roughly simulate the public-facing
+% network connection available to a blinding server
+% run on an EC2 \texttt{c4.large} VM~\cite{!!!}. %  https://cloudspectator.com/wp-content/uploads/report/iaas_generational_aws_c3_c4.compressed.pdf
+% Network emulation was performed using PF and dummynet.
+HTTP requests were generated using \texttt{ab}, the Apache
+benchmarking tool~\cite{ab}.
+
+As shown in Figure~\ref{fig:scalability}, Veil
+reduces web server throughput by roughly 70\%
+due to the additional cryptographic operations
+that Veil must perform. Remember that when
+Veil operates in regular (i.e., non-DOM hiding
+mode), Veil blinding servers mutate content in
+the background, out of the critical path for an
+HTTP response; thus, the slowdowns in Figure~\ref{fig:scalability}
+are solely caused by synchronous cryptographic
+operations.
+
+\subsubsection{Preventing Information Leakage}
+\label{sec:privLeaks}
+
+\noindent
+{\bf Name-based Interfaces:} To determine
+how well Veil protects user privacy, we created
+a baseline VM image which ran Lubuntu 13.10 and
+had two different browsers (Firefox and Chrome). In
+the baseline image, the browsers were installed, but they had
+not been used to visit any web pages. We then ran
+a series of experiments in which we loaded the
+baseline image, opened a browser, and then visited
+a single site. We took a snapshot of the browser's
+memory image using \texttt{gcore}, and we also
+examined disk state such as the browser
+cache and the log entries for DNS resolution
+requests. We did this for the regular and
+Veil-enabled versions of each page described in
+Section~\ref{sec:macrobench}.
+
+In all tests, the Veil pages were configured to
+store data in the browser cache, and in all tests,
+the cache only contained encrypted data at the
+end of the private session. Greps through the
+memory snapshots and DNS records did not reveal
+cleartext URLs or hostnames. Unsurprisingly,
+the regular versions of the web pages left
+unencrypted data in the browser cache, and
+various cleartext URLs in name-based data
+stores. To cross-validate these results, we
+repeated these experiments on Windows, and used
+the Mandiant Redline forensics tool~\cite{mandiant}
+to search for post-session artifacts in persistent
+storage. Redline confirmed that the only
+cleartext URL in the browser history was the
+URL for the Veil bootstrap page, and that all
+other URLs were blinded.
+%jwm: Maybe restore for camera-ready? Or not.
+% Note that visiting a Veil page does not add
+% a new entry to the browser's ``visited pages''
+% history, because the bootstrap page overwrites
+% itself without changing the URL in the address bar.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth]{veil-figs/heapwalk_graph.pdf}
+	\caption{The effectiveness of heap walking to prevent secrets from paging out.}
+	\label{fig:heapWalking}
+\end{figure}
+
+\noindent
+{\bf Protecting RAM Artifacts:} To determine
+whether heap walking can prevent secrets from
+paging out, we wrote a C program which gradually
+increases its memory pressure. The program allocates
+memory without deallocating any, and periodically,
+it reads the first byte in every allocated page
+to ensure that the OS considers the page to be hot.
+We ran the program inside of a QEMU VM with 1 GB
+of swap space and 1 GB of RAM. We also ran a browser
+inside of the VM. The browser had 20 open tabs.
+Each tab had a Uint8Array representing a tab-specific
+AES key, and a tab-specific set of strings in its
+HTML. The control experiments did not do heap walking.
+The test experiments used Veil's heap walking code
+to touch the AES key and the renderer state.
+
+The VM used the \texttt{pwritev} system call to
+write memory pages to the swap file. To determine
+whether secrets paged out as memory pressure
+increased, we used strace to log the \texttt{pwritev}
+calls. Since each tab contained a set of 
+unique byte patterns, we could grep through our
+\texttt{pwritev} logs to determine whether secret
+RAM artifacts hit the swap file. We ran experiments
+for increasing levels of memory pressure until the
+VM became unresponsive, at roughly 75\% in-use
+swap space.
+
+Figure~\ref{fig:heapWalking} shows the results.
+The x-axis varies the memory pressure, and the
+y-axis depicts the number of tabs which suffered
+data leakage, as determined by greps through the
+\texttt{pwritev} log. Heap walking successfully
+kept all of the secret keys from paging out, up
+to the maximum 75\% of in-use swap space. Without
+heap walking, keys begin to page out at 35\%
+swap utilization; by 50\%, all keys had swapped
+out. Note that the data points do not perfectly
+align on the x-axis due to nondeterminism in
+when the VM decides to swap data out.
+
+Heap walking was less effective for renderer
+memory pages. Those pages swapped out earlier
+and immediately in the control case, around
+35\% swap utilization. With Veil, renderer state
+also began to leak at 35\% utilization, but
+Veil still managed to safeguard 12 out of 20 tabs
+up to 63\% swap utilization.
+
+% Taking a memory snapshot using VMWare Workstation:
+%  \begin{smitemize}
+%    \item Load the VM, run a browser, interact with it,
+%          then suspend it.
+%    \item Use the \texttt{vmss2core} tool to create a
+%          core dump. For example: \begin{verbatim}"C:\Program Files (x86)\VMware\VMware Player"\vmss2core Lubuntu-e49257cd.vmss Lubuntu-e49257cd.vmem\end{verbatim}
+%    \item The core will be in a file named \texttt{vmss.core0}.
+%  \end{smitemize}
+
+% Generating a core dump for a Linux process:
+%  \begin{smitemize}
+%    \item Get the pid of the process.
+%    \item sudo gcore -o XXX.core pid
+%    \item strings -e l -a -t x XXX.core | grep YYY
+%  \end{smitemize}
+
+\subsubsection{DOM Hiding}
+\label{sec:dhEval}
+
+When Veil runs in DOM hiding mode, the client-side page
+contains no site-specific, greppable content. Thus,
+Veil does not need to perform heap walking (although
+Veil does use blinding servers to eliminate information
+leakage through name-based system interfaces). We loaded
+our test pages in DOM hiding mode, and confirmed the absence
+of site-specific content by grepping through VM images as
+we did in Section~\ref{sec:privLeaks}. 
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth]{veil-figs/domhiding_loadtime.pdf}
+	\caption{DOM hiding's impact on page load times.}
+	\label{fig:dhPageLoad}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth]{veil-figs/domhiding_click.pdf}
+	\caption{The time that a DOM-hiding page needs to respond to a
+		mouse click event.}
+	\label{fig:dhClick}
+\end{figure}
+
+Figure~\ref{fig:dhPageLoad} evaluates the impact of DOM
+hiding on a page's initial load. The client, the blinding
+server, and the content server ran on the same machine, to
+focus on computational overheads. Figure~\ref{fig:dhPageLoad}
+demonstrates that DOM hiding imposed moderate overheads,
+with page load times increasing by 1.2x--2.1x.
+When Veil runs in DOM hiding mode, image mutation
+has to be performed synchronously, for each screenshot
+that is returned to a client; screenshotting requires
+150ms--180ms, whereas image mutation requires
+170ms--200ms.
+
+Figure~\ref{fig:dhClick} shows the time that a DOM-hiding
+page needed to respond to a mouse click. Responding to
+such a GUI event required the browser to forward the
+event to the content provider, and then receive and
+display the new screenshot. Once again, the bulk of the
+end-to-end time was consumed by the screenshot capture
+and the image mutation at the content provider. 
+
+Privacy-sensitive users and web sites are often willing
+to trade some performance for better security. For
+example, fetching an HTTP object through Tor results in
+HTTP-level RTTs of more than a second~\cite{torStats}.
+Thus, we believe that the performance of Veil's 
+DOM hiding mode is adequate for many sites. However,
+Veil's performance may be too slow for sites that
+are highly interactive, or require content servers to
+frequently and proactively push new images (e.g.,
+due to animations in a page). Our next version of
+the Veil GUI proxy will grab screenshots directly
+from the content server's framebuffer~\cite{framebuffer}
+instead of via the comparatively-slow rendering API
+that browsers expose~\cite{cvt}; this implementation
+change will greatly reduce screenshotting overhead.
+
+\subsubsection{Network Latency}
+\label{sec:lat}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth]{veil-figs/network_em.pdf}
+	\caption{The impact of emulated network latency on page load
+		times. In all cases, the download bandwidth cap
+		was 30 Mbps, and the upload bandwidth cap was 10
+		Mbps, emulating a broadband connection. Bandwidth
+		was not varied because page load times are largely
+		governed by network latency, not bandwidth~\cite{gentleaggression}.}
+	\label{fig:net_em}
+\end{figure}
+
+Figure~\ref{fig:net_em} uses Chrome's built-in network
+emulation framework~\cite{chromeThrottle} to compare load times
+for three versions of the Imgur page: a normal version;
+a Veil version which used content mutation, heap
+walking, and encrypted storage; and a Veil version
+which used DOM hiding. The DOM hiding variant was largely
+insensitive to increased network latency, since loading
+a page only required two HTTP-level round trips (one to
+fetch the bootstrap page, and another to fetch the initial
+screenshot). The other variant of Veil was more sensitive
+to network latency. The reason is that, in this version of
+the page, the bootstrap code had to fetch multiple objects,
+all of which were served from the same blinding server origin
+(\texttt{https://veil.io}). Browsers cap the number
+of simultaneous connections that a client can make to
+a single origin, so the Veil page could not leverage
+domain sharding~\cite{domainSharding} to circumvent the
+cap. This limitation is not fundamental to Veil's design,
+since content providers can shard across multiple blinding
+server domains (e.g., \texttt{https://a.veil.io}
+and \texttt{https://b.veil.io}). However (and
+importantly), if a content provider wishes to use
+sharding, the provider must be careful to avoid bias
+in the mapping of objects to domains---otherwise,
+per-site fingerprints may arise in a page's access
+patterns to various domains. Thus, for some content
+providers, domain sharding may not be worth the potential
+loss in security.
+
+Domain sharding is also relevant to Content Security
+Policies (CSPs)~\cite{csp}. A CSP allows a page to restrict the
+origins which can provide specific types of content.
+For example, a CSP might state that a page can only
+load JavaScript from \texttt{https://a.com}, and CSS
+from \texttt{https://b.com}. A CSP is expressed as a
+server-provided HTTP response header; the CSP is enforced
+by the browser. CSPs are useful for preventing cross-site
+scripting attacks, but require a page to be able to
+explicitly shard content across domains. As discussed
+in the last paragraph, Veil can enable sharding at
+the cost of reduced security.
+
+\subsection{Related Work}
+\label{sec:related}
+
+%{\bf Interactions with the Cloud}\\
+%Mylar~\cite{mylar} is a platform for building
+%secure web applications atop untrusted servers.
+%Mylar only stores encrypted user data on servers,
+%and decrypts that data using client-side JavaScript.
+%Mylar defines primitives for searching over
+%encrypted data and validating the JavaScript code
+%that a potentially malicious server returns
+%to the browser. Veil focuses on client-side
+%privacy issues, but a Veil application could
+%be layered atop Mylar to provide server-side
+%protections as well.
+
+%\noindent
+%{\bf Systems Support for Data Privacy:}
+To minimize information leakage via RAM artifacts,
+applications can use best practices like pinning
+sensitive memory pages, and avoiding excessive
+copying of secret data~\cite{harrison07}.
+Operating systems and language runtimes can also
+scrub deallocated memory as quickly as
+possible~\cite{chow05}. Web browsers do not expose
+low-level OS interfaces to JavaScript code, so
+privacy-preserving sites cannot directly access
+raw memory for the purposes of secure deallocation
+or pinning. Determining the best way to expose
+raw memory to JavaScript is an open research problem,
+given the baroque nature of the same-origin policy,
+and the fact that the browser itself may contend
+with JavaScript code for exclusive access to a
+memory page (e.g., to implement garbage collection
+or tab discarding~\cite{tabDiscarding}).
+
+An OS can protect RAM artifacts by encrypting
+the swap space or the entire file system~\cite{blaze93,provos00,cryptfs}.
+Veil's content mutation and DOM hiding allow Veil
+to protect RAM artifacts even when a browser does not
+run atop an encrypted storage layer. Content mutation
+obviously does not provide a cryptographically strong
+defense, but DOM hiding allows a Veil site to avoid
+sending any site-specific, greppable content to a
+client browser.
+
+CleanOS~\cite{cleanOS} is a smartphone OS that
+protects sensitive data when mobile devices
+are lost or stolen. CleanOS defines sensitive
+data objects (SDOs) as Java objects
+and files that contain private user data.
+CleanOS observes which SDOs are not actively
+being used by an application, and encrypts
+them; the key is then sent to the cloud, deleted
+from the smartphone, and only retrieved when
+the SDOs become active again. SDOs could
+potentially be used as a building block for
+private browsing. However, SDOs are insufficient
+for implementing blinded references unless
+the SDO abstraction is spread beyond the managed
+runtime to the entire OS.
+
+Lacuna~\cite{lacuna} implements private sessions
+by running applications inside of VMs. Those VMs
+execute atop the Lacuna hypervisor and a modified
+Linux host kernel. The hypervisor and the host
+kernel collectively implement ``ephemeral'' IO
+channels. These encrypted channels allow VMs to
+communicate with hardware or small pieces of
+trusted code, but only the endpoints can access
+raw data---user-mode host processes and the majority
+of the host kernel can only see encrypted data.
+Lacuna also encrypts swap memory. Upon VM
+termination, Lacuna zeros the VM's RAM space and
+discards the ephemeral session keys.
+PrivExec~\cite{privExec} is similar to Lacuna,
+but is implemented as an OS service instead of
+a hypervisor.
+%
+% PrivExec~\cite{privExec} is an OS service that supplies
+% privacy-seeking applications with automatically encrypted
+% channels to persistent storage. Similar to Lacuna, PrivExec
+% associates private processes with ephemeral keys that are
+% used to transparently encrypt writes to the file system
+% and page file. PrivExec also monitors IPCs to ensure that
+% private session data is not leaked to non-private processes.
+% Like Lacuna, PrivExec destroys ephemeral keys when applications
+% terminate.
+%
+Lacuna and PrivExec provide stronger forensic
+deniability than Veil. However, these systems
+force layperson end-users to install and configure
+a special runtime; furthermore, private applications
+cannot persist data across sessions because keys are
+ephemeral.
+
+UCognito~\cite{ucognito} exposes a sandboxed file system
+to a private browsing session. The sandboxed file system
+resides atop the normal one, absorbing writes made during
+private browsing. When the browsing session terminates,
+UCognito discards the writes. Like PrivExec and Lacuna,
+UCognito requires a modified client-side software stack.
+UCognito also does not protect against information leakage
+via the non-sandboxed parts of the host OS. For example,
+unmodified RAM artifacts may page to the native swap file;
+DNS requests are exposed to the host's name resolution
+subsystem.
+
+Collaborative browsing frameworks~\cite{lowet09,jigsawCollab}
+allow multiple users with different browsers to
+simultaneously interact with a shared view of a web
+page. Like these frameworks, Veil's DOM hiding mode
+has to synchronize the GUI inputs and rendering activity
+that belong to a canonical version of a page. However,
+Veil only needs to support one remote viewer. More
+importantly, Veil's DOM hiding mode only exposes the
+client browser to generic JavaScript event handlers, as
+well as a bitmap display; in contrast, prior collaborative
+browsing frameworks replicate a site-specific, canonical
+DOM tree on each client browser. Prior frameworks also
+do not use blinding servers to hide information from
+client-side, name-centric interfaces like the DNS
+cache.
+
+Silo~\cite{silo} and the framework of Jiang et
+al~\cite{jiang14} use client-side bootstrap
+pages which dynamically overwrite themselves
+with new content. Silo uses this technique to
+layer a delta-encoding protocol atop HTTP;
+Jiang's system uses dynamic assembly as a crude
+copy-protection mechanism, so that users who
+right click and ``Save as'' a page will only
+store the initial bootstrap HTML and not the
+dynamically assembled content. By itself,
+dynamic assembly cannot provide strong privacy
+guarantees. For example, blinded URLs are needed
+to prevent information leakage through the DNS
+cache and the browser cache.
+
+\subsection{Conclusions}
+Veil is the first web framework that allows
+developers to implement private-session semantics
+for their pages. Using the Veil compiler,
+developers rewrite pages so that all page content
+is hosted by blinding servers. The blinding servers
+provide name indirection, preventing sensitive
+information from leaking to client-side, name-based
+system interfaces. The blinding servers mutate
+content, making object fingerprinting more
+difficult; rewritten pages also automatically
+encrypt client-side persistent storage, and
+actively walk the heap to reduce the likelihood
+that in-memory RAM artifacts will swap to disk in
+cleartext form. In the extreme, Veil transforms
+a page into a thin client which does not include
+any page-specific, greppable RAM artifacts. Veil
+automates much of the effort that is needed to
+port a page to Veil, making it easier for
+web developers to improve the privacy protections of
+their applications.
