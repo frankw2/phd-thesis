@@ -1,4 +1,1169 @@
-\section{Veil: Private Browsing Semantics Without Browser-side Assistance}
+\section[Veil: Private Browsing Semantics without Browser-side Assistance]{Veil: Private Browsing Semantics without \\ Browser-side Assistance}
 \label{chap:veil}
 
 \subsection{Motivation}
+Web browsers are the client-side execution platform
+for a variety of online services. Many of these
+services handle sensitive personal data like emails
+and financial transactions. Since a user's machine
+may be shared with other people, she may wish to
+establish a \emph{private session} with a web site,
+such that the session leaves no persistent
+client-side state that can later be examined by a
+third party. Even if a site does not handle
+personally identifiable information, users may
+not want to leave evidence that a site was even
+visited. Thus, all popular browsers implement a
+private browsing mode which tries to remove
+artifacts like entries in the browser's ``recently
+visited'' URL list.
+
+Unfortunately, implementations of private browsing
+mode still allow sensitive information to leak into
+persistent storage~\cite{aggarwal10,dt2016,magnetForensicsChrome,ohana13}.
+Browsers use the file system or a SQLite database
+to temporarily store information associated with private
+sessions; this data is often incompletely deleted
+and zeroed-out when a private session terminates,
+allowing attackers to extract images and URLs from
+the session. During a private session, web page
+state can also be reflected from RAM into swap
+files and hibernation files; this state is in cleartext,
+and therefore easily analyzed by curious individuals
+who control a user's machine after her private
+browsing session has ended. Simple greps for
+keywords are often sufficient to reveal sensitive
+data~\cite{aggarwal10,dt2016}.
+
+Web browsers are complicated platforms that are
+continually adding new features (and thus new ways
+for private information to leak). As a result, it is
+difficult to implement even seemingly straightforward
+approaches for strengthening a browser's implementation
+of incognito modes. For example, to prevent secrets in
+RAM from paging to disk, the browser could use OS
+interfaces like \texttt{mlock()} to pin memory pages.
+However, pinning may interfere in subtle ways with other
+memory-related functionality like garbage collecting or
+tab discarding~\cite{tabDiscarding}.
+% which tries to minimize RAM usage by unloading the
+% content in dormant tabs.
+Furthermore, the browser would have to use \texttt{mlock()}
+indiscriminately, on \textit{all} of the RAM state
+belonging to a private session, because the browser would
+have no way to determine which state in the session is
+actually sensitive, and which state can be safely
+exposed to the swap device.
+
+In this paper, we introduce Veil, a system
+that allows web developers to implement
+private browsing semantics for their own pages.
+For example, the developers of a whisteblowing
+site can use Veil to reduce the likelihood
+that employers can find evidence of visits to
+the site on workplace machines.
+Veil's privacy-preserving mechanisms are
+enforced \emph{without assistance from the
+	browser}---even if users visit pages using
+a browser's built-in privacy mode, Veil
+provides stronger assurances that
+can only emerge from an intentional
+composition of HTML, CSS, and JavaScript.
+Veil leverages five techniques to protect
+privacy: URL blinding, content mutation,
+heap walking, DOM hiding, and state encryption.
+\begin{itemize}
+	\item Developers pass their HTML and CSS files through
+	Veil's compiler. The compiler locates cleartext
+	URLs in the content, and transforms those raw
+	URLs into \emph{blinded references} that are
+	derived from a user's secret key and are
+	cryptographically unlinkable to the original
+	URLs. The compiler also injects a runtime
+	library into each page; this library interposes
+	on dynamic content fetches (e.g., via
+	Veil{XMLHttpRequests}), and forces those
+	requests to also use blinded references.
+	\item The compiler uploads the objects in a web page to
+	Veil's \emph{blinding servers}. A user's browser
+	downloads content from those blinding servers, and
+	the servers collaborate with a page's JavaScript
+	code to implement the blinded URL protocol. To
+	protect the client-side memory artifacts belonging
+	to a page, the blinding servers also \emph{dynamically
+		mutate} the HTML, CSS, and JavaScript in a page.
+	Whenever a user fetches a page, the blinding servers
+	create syntactically different (but semantically
+	equivalent) versions of the page's content. This
+	ensures that two different users of a page will
+	each receive unique client-side representations
+	of that page.
+	\item Ideally, sensitive memory artifacts would never
+	swap out in the first place. Veil allows developers
+	to mark JavaScript state and renderer state as
+	sensitive. Veil's compiler injects \emph{heap
+		walking code} to keep that state from swapping out.
+	The code uses JavaScript reflection
+	and forced DOM relayouts to periodically touch the
+	memory pages that contain secret data. This coerces
+	the OS's least-recently-used algorithm to keep the
+	sensitive RAM pages in memory.
+	\item Veil sites which desire the highest level of privacy can
+	opt to use Veil's \emph{DOM hiding} mode. In this
+	mode, the client browser essentially acts as a dumb
+	graphical terminal. Pages are rendered on a content
+	provider's machine, with the browser sending user inputs
+	to the machine via the blinding servers; the content
+	provider's machine responds with new bitmaps that
+	represent the updated view of the page. In DOM hiding
+	mode, the page's unique HTML, CSS, and JavaScript content
+	is never transmitted to the client browser.
+	\item Veil also lets a page store private, persistent
+	state by \emph{encrypting} that state and by naming
+	it with a blinded reference that only the user can
+	generate.
+\end{itemize}
+By using blinded references for all content names (including
+those of top-level web pages), Veil avoids information leakage
+via client-side, name-centric interfaces like the
+DNS cache~\cite{timingAttacks}, the browser cache, and
+the browser's address bar.
+% jwm: We might want to omit the next sentence, since I think
+%      that the CSS link color attack has been fixed by browsers
+%      for a while now.
+% Blinded references also protect against more subtle data
+% exfiltrations, like the use of CSS styles to detect which
+% resources a browser has previously downloaded~\cite{cssHistoryAttack,cssHistoryAttack2}.
+Encryption allows a Veil page to safely leverage the
+browser cache to reduce page load times, or store user data
+across different sessions of the private web page. A page
+that desires the highest level of security will eschew even
+the encrypted cache, and use DOM hiding; in concert with URL
+blinding, the hiding of DOM content means that the page will
+generate \emph{no greppable state in RAM or persistent storage}
+that could later be used to identify the page. Table~\ref{t:modeTable}
+summarizes the different properties of Veil's two modes for
+private browsing.
+%!!!jwm: So, we should probably have an experiment in which
+%        we load a page in DOM hiding mode using a VM, and
+%        then we grep the VM snapshot for content that resides
+%        in the page.
+
+% Wowsers, it's much easier to design LaTeX tables using a
+% graphical table generator! I used this one for the table
+% below:
+%        http://www.tablesgenerator.com/#
+\begin{table*}[t!]
+\scalebox{0.58}{		
+	\centering
+	\begin{tabular}{lllll}
+		\large
+		\begin{tabular}[c]{@{}l@{}}\ \\ \ \\ Browsing mode\end{tabular}                                                                                 & \begin{tabular}[c]{@{}l@{}}\ \\ Persistent, per-site client-side\\ storage\end{tabular} & \begin{tabular}[c]{@{}l@{}}Information leaks\\ through client-side,\\ name-based  interfaces\end{tabular} & \begin{tabular}[c]{@{}l@{}}\ \\  \ \\ Per-site browser RAM artifacts\end{tabular} & \begin{tabular}[c]{@{}l@{}}\ \\  \ \\ GUI interactions\end{tabular} \\ \hline
+		\multicolumn{1}{|l|}{Regular browsing}                                                                                                          & \multicolumn{1}{l|}{Yes (cleartext by default)}                                         & \multicolumn{1}{l|}{Yes}                                                                                  & \multicolumn{1}{l|}{Yes}                                                          & \multicolumn{1}{l|}{Locally processed}                              \\ \hline
+		\multicolumn{1}{|l|}{Regular incognito mode}                                                                                                    & \multicolumn{1}{l|}{No}                                                                 & \multicolumn{1}{l|}{Yes}                                                                                  & \multicolumn{1}{l|}{Yes}                                                          & \multicolumn{1}{l|}{Locally processed}                              \\ \hline
+		\multicolumn{1}{|l|}{\begin{tabular}[c]{@{}l@{}}Veil with encrypted\\ client-side storage, mutated\\ DOM content, heap walking\end{tabular}} & \multicolumn{1}{l|}{Yes (always encrypted)}                                             & \multicolumn{1}{l|}{No (blinding servers)}                                                                                   & \multicolumn{1}{l|}{Yes (but mutated and heap-walked)}                            & \multicolumn{1}{l|}{Locally processed}                              \\ \hline
+		\multicolumn{1}{|l|}{Veil with DOM hiding}                                                                                                   & \multicolumn{1}{l|}{No}                                                                 & \multicolumn{1}{l|}{No (blinding servers)}                                                                                   & \multicolumn{1}{l|}{No}                                                           & \multicolumn{1}{l|}{Remotely processed}                             \\ \hline
+	\end{tabular}
+}
+	\vspace{3mm}
+	\caption{A comparison between Veil's two browsing modes, regular incognito browsing,
+		and regular browsing that does not use incognito mode.}
+	\label{t:modeTable}
+\end{table*}
+
+In summary, \textbf{Veil is the first web framework that allows
+	developers to implement privacy-preserving browsing
+	semantics for their own pages.} These semantics are stronger
+than those provided by native in-browser incognito modes;
+however, Veil pages load on commodity browsers, and do
+not require users to reconfigure their systems or run their
+browsers within a special virtual machine~\cite{lacuna}. 
+Veil can translate legacy pages to more secure versions
+automatically, or with minimal developer assistance 
+(\S\ref{sec:porting}), easing the barrier to deploying
+privacy-preserving sites. Experiments show that
+Veil's overheads are moderate: 1.25x--3.25x for Veil
+with encrypted client-side storage, mutated DOM content,
+and heap walking; and 1.2x--2.1x for Veil in DOM hiding mode.
+
+\subsection{Deployment Model}
+\label{sec:depModel}
+
+Veil uses an opt-in model, and is intended
+for web sites that want to actively protect
+client-side user privacy. For example, a
+whistleblowing site like SecureDrop~\cite{secureDrop}
+is incentivized to hide client-side evidence
+that the SecureDrop website has been visited;
+strong private browsing protections give people
+confidence that visiting SecureDrop on a work
+machine will not lead to incriminating aftereffects.
+As another example of a site that is well-suited
+for Veil, consider a web page that allows
+teenagers to find mental health services. Teenagers
+who browse the web on their parents' machines 
+will desire strong guarantees that the
+machines store no persistent records of private
+browsing activity.
+
+Participating Veil sites must explicitly recompile
+their content using the Veil compiler. This
+requirement is not unduly burdensome, since
+all non-trivial frameworks for web development impose
+a developer-side workflow discipline. For example,
+Aurelia~\cite{aurelia}, CoffeeScript~\cite{coffeeScript}, and
+Meteor~\cite{meteor} typically require a
+compilation pass before content can go live.
+
+Participating Veil sites must also explicitly serve
+their content from Veil blinding servers. Like
+Tor servers~\cite{tor}, Veil's blinding servers
+can be run by volunteers, although content providers
+can also contribute physical machines or VMs to
+the blinding pool (\S\ref{sec:bservs}).
+
+Today, many sites are indifferent
+towards the privacy implications of web browsing;
+other sites are interested in protecting privacy,
+but lack the technical skill to do so; and others
+are actively invested in using technology to hide
+sensitive user data. Veil targets the latter
+two groups of site operators. Those groups are
+currently in the minority, but they are growing.
+An increasing number of web services define their
+value in terms of privacy protections~\cite{duckduck,enigma,privio,privly},
+and recent events have increased popular
+awareness of privacy issues~\cite{torAfterSnowden}.
+Thus, we believe that frameworks like Veil will
+become more prevalent as users demand more
+privacy, and site operators demand more tools to
+build privacy-respecting systems.
+
+\subsection{Threat Model}
+\label{sec:threatModel}
+
+As described in Section~\ref{sec:depModel}, Veil
+assumes that a web service is actively interested
+in preserving its users' client-side privacy.
+Thus, Veil trusts web developers and the blinding servers.
+Veil's goal is to defend the user against local
+attackers who take control of a user's machine
+\textit{after} a private session terminates. If an
+attacker has access to the machine \emph{during} a
+private session, the attacker can directly extract
+sensitive data, e.g., via keystroke logging or by
+causing the browser to core dump; such exploits are
+out-of-scope for this paper.
+
+Veil models the post-session attacker as a skilled
+system administrator who knows the location and purpose
+of the swap file, the browser cache, and files like
+Veil{/var/log/*} that record network activity
+like DNS resolution requests. Such an attacker can
+use tools like \texttt{grep} or \texttt{find} to
+look for hostnames, file types, or page content that
+was accessed during a Veil session. The attacker
+may also possess off-the-shelf forensics tools like
+Mandiant Redline~\cite{mandiant} that look for traces
+of private browsing activity. However, the attacker
+lacks the skills to perform a customized, low-level
+forensics investigation that, e.g., tries to manually
+extract C++ data structures from browser memory
+pages that Veil could not prevent from swapping out.
+
+Given this attacker model, Veil's security goals are
+weaker than strict forensic deniability~\cite{lacuna}.
+However, Veil's weaker type of forensic resistance
+is both practically useful and, in many cases, the
+strongest guarantee that can be provided without
+forcing users to run browsers within special OSes or
+virtual machines. Veil's goal is to load pages within
+\textit{unmodified} browsers that run atop
+\textit{unmodified} operating systems. Thus, Veil
+is forced to implement privacy-preserving features
+using browser and OS interfaces that are unaware of
+Veil's privacy goals. These constraints make it
+impossible for Veil to provide strict forensic
+deniability. However, most post-session attackers
+(e.g., friends, or system administrators at work,
+Internet cafes, or libraries) will
+lack the technical expertise to launch FBI-style
+forensic investigations.
+
+%Previous investigations of private browsing assumed
+%that the goal of the system is to leave no persistent
+%client-side state. In Veil, a page can choose to leave
+%no persistent browser cache state; alternatively,
+%a page can choose to leave \emph{encrypted} state that is
+%only decryptable by the user. Using encrypted browser
+%cache objects, a Veil page can reduce its load time
+%and safely maintain configuration state across multiple
+%private sessions.
+
+Using blinded URLs, Veil tries to prevent data leaks
+through system interfaces that use network names.
+Examples of name-based interfaces are the browser's ``visited pages''
+history, the browser cache, cookies, and the DNS
+cache (which leaks the hostnames of the web servers
+that a browser contacts~\cite{aggarwal10}). It is
+acceptable for the attacker to learn that a user
+has contacted Veil's blinding servers---those
+servers form a large pool whose hostnames are generic
+(e.g., \texttt{Veil.io}) and do not reveal
+any information about particular Veil sites
+(\S\ref{sec:bservs}).
+
+Veil assumes that web developers only include
+trusted content that has gone through the Veil
+compiler.
+% jwm: I think that the sentence below is redundant,
+%      given the previous sentence.
+% Thus, Veil assumes that a page does not embed
+%  unrewritten libraries that update local storage
+% or issue unblinded network requests.
+A page may embed third party content like a JavaScript
+library, but the Veil compiler analyzes both
+first party and third party content during compilation
+(\S\ref{sec:compiler}).
+
+Heap walking (\S\ref{sec:heapWalk}) allows Veil
+to prevent sensitive RAM artifacts from swapping to
+disk. Veil does not try to stop information
+leaks from GPU RAM~\cite{lee2014}, but GPU RAM
+is never swapped to persistent storage. 
+%Veil also cannot prevent the browser from leaking memory
+%artifacts through core dumps. We assume that the
+%browser does not autonomously try to exfiltrate
+%application state, e.g., by sending analytics to
+%the browser vendor.
+Poorly-written or malicious browser extensions that leak
+sensitive page data~\cite{lerner13} are also outside the
+scope of this paper.
+
+\subsection{Design}
+\label{sec:design}
+
+\begin{figure*}[t!]
+	\centering
+	\includegraphics[width=\textwidth]{veil-figs/arch_small_cropped}
+	\caption{The Veil architecture (cryptographic operations omitted for clarity).}
+	\label{fig:arch}
+\end{figure*}
+
+As shown in Figure~1, the Veil framework  %!!!jwm: Arg, the fig ref isn't resolving correctly.
+consists of three components. The \emph{compiler}
+transforms a normal web page into a new version
+that implements static and dynamic privacy protections.
+Web developers upload the compiler's output to
+\emph{blinding servers}. These servers act as
+intermediaries between content publishers and
+content users, mutating and encrypting content. To load the Veil
+page, a user first loads a small \emph{bootstrap page}.
+The bootstrap asks for a per-user key and the
+URL of the Veil page to load; the bootstrap then
+downloads the appropriate objects from the blinding
+servers and dynamically overwrites itself with
+the privacy-preserving content in the target page.
+
+In the remainder of this section, we describe Veil's
+architecture in more detail. Our initial discussion
+involves a simple, static web page that consists of
+an HTML file, a CSS file, a JavaScript file, and an
+image. We iteratively refine Veil's design to protect
+against various kinds of privacy leakage. Then, we
+describe how Veil handles more complex pages that
+dynamically fetch and generate new content.
+
+
+\subsubsubsection{The Veil Compiler and veilFetch()}
+\label{sec:compiler}
+\vspace{-1mm}
+The compiler processes the HTML in our example page (Figure~1),
+and finds references to three external objects (i.e.,
+the CSS file, the JavaScript file, and the image).
+The compiler computes a hash value for each object,
+and then replaces the associated HTML tags with
+dynamic JavaScript loaders for the objects. For
+example, if the original image tag looked like this:
+\begin{verbatim}
+<img src="http://foo.com/img.jpg"/>
+\end{verbatim}
+\noindent
+the compiler would replace that tag with the following:
+\noindent
+\begin{verbatim}
+<script>obscuraFetch("b6a0d...");</script>
+\end{verbatim}
+where the argument to \texttt{veilFetch()} is the hash
+name of the image. At page load time, when
+\texttt{veilFetch()} runs, it uses an \texttt{XMLHttpRequest}
+request to download the appropriate object from the
+blinding service. In our example, the URL in the
+\texttt{XMLHttpRequest} might be \texttt{http://veil.io/b6a0d...}.
+
+Such a URL resides in the domain of the blinding
+servers, not the domain of the original content
+publisher. Furthermore, the URL identifies the underlying
+object by hash, so the URL itself does not leak
+information about the original publisher or the data
+contained within the object. So, even though the
+execution of \texttt{veilFetch()} may pollute
+name-based interfaces like the DNS cache, a post-session
+attacker which inspects those registries
+cannot learn anything about the content that was fetched.
+However, a network-observing attacker who sees a
+\texttt{veilFetch()} URL can simply ask the blinding
+server for the associated content, and then directly
+inspect the data that the user accessed during the
+private session!
+
+To defend against such an attack, Veil associates
+each user with a symmetric key $k_{user}$ (we describe
+how this key is generated and stored in
+Section~\ref{sec:bootstrap}). Veil also associates the
+blinding service with a public/private keypair. When
+\texttt{veilFetch(hashName)} executes, it does not
+ask the blinding service for \texttt{hashName}---instead,
+it asks for \texttt{<hashName>}$_{k_{user}}$. In the
+HTTP header for the request, \texttt{veilFetch()} includes
+$<k_{user}>_{PubKeyBServ}$, i.e., the user's symmetric
+key encrypted by the blinding service's public key.
+When the blinding service receives the request,
+it uses its private key to decrypt $<k_{user}>_{PubKeyBServ}$.
+Then, it uses $<k_{user}>$ to extract the hash
+name of the requested object. The blinding service
+locates the object, encrypts it with $k_{user}$,
+and then sends the HTTP response back to the
+client. Figure~\ref{fig:fetchProtocol} depicts
+the full protocol.\footnote{%The protocol shown in
+	%Figure~\ref{fig:fetchProtocol} requires a public
+	%key operation for each request. However,
+	A stateful blinding service can cache decrypted
+	user keys and eliminate the public key operation
+	from all but the user's first request.} In practice,
+the blinding service's public/private
+keypair can be the service's TLS keypair, as used
+by HTTPS connections to the service. Thus, the
+encryption of $k_{user}$ can be encrypted by the
+standard TLS mechanisms used by an HTTPS connection.
+
+Once \texttt{veilFetch()} receives the response,
+it decrypts the data and then dynamically
+reconstructs the appropriate object, replacing
+the script tag that contained \texttt{veilFetch()}
+with the reconstructed object. The compiler
+represents each serialized object using JSON~\cite{json};
+Figure~\ref{fig:imgJson} shows an example
+of a serialized image. To reinflate
+the image, \texttt{veilFetch()} extracts
+metadata like the image's width and height,
+and dynamically injects an image tag into
+the page which has the appropriate attributes.
+Then, \texttt{veilFetch()} extracts the
+Base64-encoded image data from the JSON,
+and sets the \texttt{src} attribute
+of the image tag to a data URL~\cite{dataUrl}
+which directly embeds the Base64 image
+data. This causes the browser to load the
+image. \texttt{veilFetch()} uses similar
+techniques to reinflate other content types.
+
+\begin{figure}[t]
+	\centering
+	\includegraphics{veil-figs/fetchProtocol_cropped}
+	\caption{The \texttt{veilFetch()} protocol.}
+	\label{fig:fetchProtocol}
+\end{figure}
+
+\begin{center}
+\begin{figure}[t]
+		\begin{BVerbatim}
+		    {"img_type": "jpeg",
+		    "dataURI": "ab52f...",
+		    "tag_attrs": {"width": "20px",
+		    "height": "50px"}}
+		\end{BVerbatim}	
+	\caption{A serialized \texttt{<img>} tag.}
+	\label{fig:imgJson}
+\end{figure}
+\end{center}
+
+This client-server protocol has several nice
+properties. First, it solves the replay
+problem---if an attacker wants to replay
+old fetches, or guess visited URLs (as in a
+CSS-based history attack~\cite{cssHistoryAttack,cssHistoryAttack2}),
+the attacker will not be able to decrypt the
+responses unless she has the user's key. Also,
+since the blinding service returns encrypted
+content, that encrypted content is what would
+reside in the browser cache. Thus, Veil pages
+can now persist data in the browser cache
+such that only the user can decrypt and inspect
+that content. Of course, a page does not have
+to use the browser cache---when a publisher
+uploads an object to the blinding service,
+the publisher indicates the caching headers that the
+service should return to clients.
+
+In addition to uploading data objects like
+images to the blinding service, the compiler
+also uploads ``root'' objects. Root objects
+are simply top-level HTML files like \texttt{foo.com/index.html}.
+Root objects are signed with the publisher's
+private key, and are stored in a separate
+namespace from data objects using a 2-tuple
+key that consists of the publisher name
+(\texttt{foo.com}) and the HTML name
+(\texttt{index.html}). Unlike data objects,
+which are named by hash (and thus self-verifying),
+root objects change over time as the associated
+HTML evolves. Thus, root objects are
+signed by the publisher to guarantee
+authenticity and allow the blinding service
+to reject fradulent updates.
+
+
+\subsubsection{The Blinding Service}
+\label{sec:bservs}
+
+In the previous section, we described the
+high-level operation of the blinding service.
+It exports a key/value interface to content
+publishers, and an HTTP interface to browsers.
+The HTTP code path does content encryption
+as described above. As described in
+Section~\ref{sec:mutation}, the blinding
+service also performs \emph{content mutation}
+to protect RAM artifacts that spill to disk;
+mutation does not provide cryptographically
+strong protections, but it does significantly
+raise the difficulty of post-session forensics.
+%We discuss specific mutation techniques in
+%Section~\ref{sec:mutation}); for now, we note
+%that mutation is a complement to heap walking
+%(\S\ref{sec:heapWalk}), a separate technique
+%which decreases the likelihood that RAM
+%artifacts page out in the first place.
+The blinding servers also implement the DOM
+hiding protocol (\S\ref{sec:domHiding}), which
+Veil sites can use to prevent exposing \emph{any}
+site-specific HTML, CSS, or JavaScript to client
+browsers.
+
+%Content encryption allows Veil pages to
+%securely persist state in the browser cache.
+%However, this encryption cannot protect an
+%application's in-memory data structures if those
+%structures are reflected to disk, e.g., during
+%paging, or when the system goes into hibernation
+%mode and the OS takes a RAM snapshot. We assume
+%that an attacker gains access to the user's machine
+%after the private session has terminated, but
+%operating systems frequently do not zero-out
+%swap files and hibernation files. This allows
+%forensic tools to find evidence of prior browsing
+%sessions, \emph{even if those sessions used
+%a native browser privacy mode}~\cite{aggarwal10,magnetForensicsChrome,ohana13}. 
+
+%To make it more difficult for attackers to
+%analyze memory artifacts, the blinding service
+%\emph{mutates} the content that it returns to
+%clients. Mutation generates objects that are
+%structurally different from (but semantically
+%%equivalent to) the canonical versions that
+%were uploaded by the publisher. Content mutation
+%ensures that, on different clients, each
+%in-memory representation of an object is
+%different. This prevents replay fingerprinting
+%attacks in which the adversary loads a candidate
+%private page on his own browser, extracts RAM
+%artifacts, and then compares those artifacts
+%to those that reside in the user's page file
+%or hibernation file. As we describe below,
+%mutation also makes it difficult for attackers
+%to perform a first-principles analysis on memory
+%images.
+
+The blinding service can be implemented
+in multiple ways, e.g., as a peer-to-peer
+distributed hash table~\cite{pastry,chord},
+a centralized service that is run by a
+trusted authority like the EFF,
+or even a single cloud VM that is paid for and
+operated by a single privacy-conscious user. In
+practice, we expect a blinding service to be run
+by an altruistic organization like the EFF, or by
+altruistic individuals (as in Tor~\cite{tor}),
+or by a large set of privacy-preserving
+sites who will collaboratively pay for the cloud
+VMs that run the blinding servers. Throughout the
+paper, we refer to a single blinding service
+\texttt{veil.io} for convenience.
+However, independent entities can simultaneously
+run independent blinding services.
+
+Veil's publisher-side protocol is compatible
+with accounting, since the blinding service knows
+which publisher uploaded each object, and how many
+times that object has been downloaded by clients.
+Thus, it is simple for a cloud-based blinding service
+to implement proportional VM billing, or cost-per-download
+billing. In contrast, an altruistic blinding service
+(e.g., implemented atop a peer-to-peer DHT~\cite{pastry,chord})
+could host anonymous object submissions for free.
+%To minimize the client-perceived fetch latencies
+%for blinded objects, the blinding servers should
+%be widely distributed, similar to CDN nodes.
+
+\subsubsection{The Same-origin Policy}
+\label{sec:sop}
+
+A single web page can aggregate content from a
+variety of different origins. As currently
+described, Veil maps all of these objects to
+a single origin: at compile time, Veil downloads
+the objects from their respective domains, and
+at page load time, Veil serves all of the
+objects from \texttt{https://veil.io}.
+
+The browser uses the same-origin policy~\cite{sop}
+to constrain the interactions between content
+from different origins. Mapping all content to
+a single origin would effectively disable
+same-origin security checks. Thus, Veil's static
+rewriter injects the \texttt{sandbox} attribute~\cite{iframeSandbox}
+into all \texttt{<iframe>} tags. Using this
+attribute, the rewriter forces the browser
+to give each frame a unique origin with respect
+to the same-origin policy. This means that,
+even though all frames are served from the
+\texttt{veil.io} domain, they cannot tamper
+with each other's JavaScript state. In our current
+implementation of the compiler, developers are
+responsible for ensuring that dynamically-generated
+frames are also tagged with the \texttt{sandbox}
+attribute; however, using DOM virtualization~\cite{treehouse,mugshot},
+the compiler could inject DOM interpositioning
+code that automatically injects \texttt{sandbox}
+attributes into dynamically-generated frames.
+
+DOM storage~\cite{domStorage} exposes the
+local disk to JavaScript code using a key/value
+interface. DOM storage is partitioned by origin,
+i.e., a frame can only access the DOM storage of
+its own domain. By assigning an ephemeral, unique
+origin to each frame, Veil seemingly prevents
+an origin from reliably persisting data across
+multiple user sessions of a Veil page. To solve
+this problem, Veil uses indirection. When a
+frame wants to access DOM storage, it first
+creates a child frame which has the special URL
+\texttt{https://veil.io/domStorage}. The child
+frame provides Veil-mediated access to DOM storage,
+accepting read and write requests from the parent
+frame via \texttt{postMessage()}. Veil associates
+a private storage area with a site's public key,
+and engages in a challenge/response protocol
+with a frame's content provider before agreeing
+to handle the frame's IO requests; the challenge/response
+traffic goes through the blinding servers (\S\ref{sec:dynamic}).
+The Veil frame that manages DOM storage employs
+the user's key to encrypt and
+integrity-protect data before writing it,
+ensuring that post-session attackers cannot
+extract useful information from DOM storage
+disk artifacts.
+
+Since Veil assigns random, ephemeral origins
+to frames, cookies do not work in the standard
+way. To simulate persistent cookies, an origin
+must read or write values in DOM storage. Sending
+a cookie to a server also requires explicit
+action. For example, a Veil page which contains
+personalized content might use an initial piece
+of non-personalized JavaScript to find the local
+cookie and then generate a request for dynamic
+content (\S\ref{sec:dynamic}).
+
+\subsubsubsection{The Bootstrap Page}
+\label{sec:bootstrap}
+Before the user can visit any Veil sites, she
+must perform a one-time initialization step
+with the Veil bootstrap page (e.g., \texttt{https://veil.io}).
+The bootstrap page generates a private symmetric key for
+the user and places it in local DOM storage,
+protecting it with a user-chosen password. Veil
+protects the in-memory versions of the password and
+symmetric key with heap walking (\S\ref{sec:heapWalk})
+to prevent these cleartext secrets from paging to disk.
+
+Later, the user determines the URL (e.g., \texttt{foo.com/index.html})
+of a Veil site to load. The user should discover
+this URL via an already-known Veil page like a
+directory site, or via out-of-band mechanisms like a
+traditional web search on a different machine than the
+one needing protection against post-session attackers; looking
+for Veil sites using a traditional search engine
+on the target machine would pollute client-side state
+with greppable content. Once the user possesses the
+desired URL, she returns to the bootstrap page. The
+bootstrap prompts the user for her password, extracts
+her key from local storage, and decrypts it with the
+password. The bootstrap then prompts the user for
+the URL of the Veil page to visit. The bootstrap
+fetches the root object for the page. Then, the
+bootstrap overwrites itself with the HTML in the
+root object. Remember that this HTML is the output
+of the Veil compiler; thus, as the browser loads
+the HTML, the page will use \texttt{veilFetch()}
+to dynamically fetch and reinflate encrypted objects.
+
+Once the bootstrap page overwrites itself, the user
+will see the target page. However, no navigation will
+have occurred, i.e., the browser's address bar will
+still say \texttt{https://veil.io}. Thus,
+the browser's history of visited pages will
+never include the URL of a particular Veil page,
+only the URL of the generic Veil bootstrap. The
+compiler rewrites links within a page so that, if
+the user clicks a link, the page will fetch the
+relevant content via a blinded URL, and then deserialize
+and evaluate that content as described above.
+
+\subsubsubsection{Protecting RAM Artifacts}
+\label{sec:heapWalk}
+
+As a Veil page creates new JavaScript objects,
+the browser transparently allocates physical
+memory pages on behalf of the site. Later,
+the OS may swap those pages to disk if memory
+pressure is high and those pages are infrequently
+used. JavaScript is a high-level, garbage-collected
+language that does not expose raw memory addresses.
+Thus, browsers do not define JavaScript interfaces
+for pinning memory, and Veil has no explicit way
+to prevent the OS from swapping sensitive data
+to disk.
+
+By frequently accessing sensitive JavaScript
+objects, Veil \emph{can} ensure that the
+underlying memory pages are less likely to be
+selected by the OS's LRU replacement algorithm.
+Veil's JavaScript runtime defines a \texttt{markAsSensitive(obj)}
+method; using this method, an application indicates
+that Veil should try to prevent \texttt{obj}
+from paging to disk. Internally, Veil maintains
+a list of all objects passed to \texttt{markAsSensitive()}.
+A periodic timer walks this list, accessing every
+property of each object using JavaScript reflection
+interfaces. Optionally, \texttt{markAsSensitive()} can
+recurse on each object property, and touch every
+value in the object tree rooted by \texttt{obj}.
+Such recursive traversals make it easier for
+developers to mark large sets of objects at
+once. JavaScript defines a special \texttt{window}
+object that is an alias for the global namespace, so
+if an application marks \texttt{window} as
+recursively sensitive, Veil will periodically
+traverse the entire heap graph that is reachable
+from global variables. Using standard techniques
+from garbage collection algorithms, Veil can
+detect cycles in the graph and avoid infinite
+loops.
+
+\texttt{markAsSensitive()} maintains references
+to all of the sensitive objects that it has ever
+visited. This prevents the browser from garbage
+collecting the memory and possibly reusing it
+without applying secure deallocation~\cite{chow05}.
+At page unload time, Veil walks the sensitive list
+a final time, deleting all object properties.
+Since JavaScript does not expose raw memory,
+Veil cannot \texttt{memset()} the objects to
+zero, but deleting the properties does make
+it more difficult for a post-session attacker
+to reconstruct object graphs.
+
+Sensitive data can reside in the JavaScript
+heap, but it can also reside in the memory
+that belongs to the renderer. The renderer is
+the browser component that parses HTML,
+calculates the screen layout, and repaints
+the visual display. For example, if a page
+contains an HTML tag like \texttt{<b>Secret</b>},
+the cleartext string \texttt{Secret} may
+page out from the renderer's memory. As another
+example, a rendered page's image content
+may be sensitive.
+
+The renderer is a C++ component that is
+separate from the JavaScript engine;
+JavaScript code has no way to directly
+access renderer state. However, JavaScript
+can indirectly touch renderer memory
+through preexisting renderer interfaces.
+For example, if the application creates
+an empty, invisible \texttt{<img>} tag,
+and injects the tag into the page's HTML,
+the browser invalidates the page's layout.
+If the application then reads the size
+of the image tag's parent, the browser is
+forced to recalculate the layout of the
+parent tag. Recalculating the layout
+touches renderer memory that is associated
+with the parent tag (and possibly other
+tags). Thus, Veil can walk the renderer
+memory by periodically injecting invisible
+tags throughout the HTML tree (forcing
+a relayout) and then removing those
+tags, restoring the original state of
+the application.
+
+The browser's network stack contains memory
+buffers with potentially sensitive content
+from the page. However, Veil only transmits
+encrypted data over the network, so network
+buffers reveal nothing to an attacker if
+they page out to disk and are subsequently
+recovered. Importantly, Veil performs
+heap walking on the user's password and
+symmetric key. This prevents those secrets
+from paging out and allowing an attacker
+to decrypt swapped out network buffers.
+
+\subsubsubsection{Mutation Techniques}
+\label{sec:mutation}
+Veil's main protection mechanism for RAM
+artifacts is heap walking, and we show in
+Section~\ref{sec:privLeaks} that heap walking
+is an effective defense during expected rates
+of swapping. However, Veil provides a second
+line of defense via content mutation. Mutation
+ensures that, each time a client loads a page,
+the page will return different HTML, CSS, and
+JavaScript, even if the baseline version of the
+page has not changed. Mutation makes grep-based
+attacks more difficult, since the attacker
+cannot simply navigate to a non-Veil version
+of a page, extract identifying strings from the
+page, and then grep local system state for those
+strings. Content mutation is performed by the
+blinding servers (\S\ref{sec:bservs}); below,
+we briefly sketch some mutation techniques
+that the blinding servers can employ.
+
+Note that blinding servers can mutate content
+in the background, \textit{before} the associated
+pages are requested by a client. For example,
+blinding servers can store a pool of mutated
+versions for a single object, such that, when
+a client fetches HTML that refers to the
+object, the blinding server can late-bind
+the mutated version that the page references.
+Using this approach, mutation costs need not
+be synchronous overheads that are paid when
+a client requests a page.\\
+
+\noindent
+{\bf JavaScript:} To mutate JavaScript files, the
+blinding service uses techniques that are adapted
+from metamorphic viruses~\cite{hunting06}. Metamorphic
+viruses attempt to elude malware scanners by
+ensuring that each instantiation of the virus has
+syntactically different code that preserves the
+behavior of the base implementation. For example,
+functions can be defined in different places, and
+implemented using different sequences of assembler
+instructions that result in the same output.
+
+Our prototype blinding service mutates JavaScript code
+using straightforward analogues of the transformations
+described above. JavaScript code also has
+a powerful advantage that assembly code
+lacks---the \texttt{eval()} statement provides a
+JavaScript program with the ability to emit new
+mutated code at runtime. Such ``\texttt{eval()}-folding''
+is difficult to analyze~\cite{zozzle}, particularly
+if the attacker can only recover a partial set of
+RAM artifacts for a page.\footnote{Some .NET viruses
+	already leverage access to the runtime's reflection
+	interface to dynamically emit code~\cite{szor05}.}
+
+However, note that if a faulty blinding server forgets to mutate invocations
+of \texttt{veilFetch(hashName)}, then unscrambled object
+hash names may be paged out to disk in JavaScript source code! If an attacker
+recovered such artifacts, he could directly replay the
+object fetches that were made by the private session.
+Thus, JavaScript mutation is a core responsibility for
+the blinding service.\\
+
+\noindent
+{\bf HTML and CSS:} The grammars for HTML and CSS are
+extremely complex and expressive. Thus, there are many
+ways to represent a canonical piece of HTML or
+CSS~\cite{webAppObfuscation}. For example, HTML allows %!!!Make sure I'm getting the details of this right.
+a character to be encoded as a raw binary symbol in a
+character encoding like \texttt{UTF-8} or \texttt{Unicode-16}.
+HTML also allows characters to be expressed as escape
+sequences known as HTML entities. An HTML entity consists
+of the token ``\&\#'' followed by the Unicode code point
+for a character and then a semicolon. For instance, the
+HTML entity for ``a'' is ``\&\#97;''. The HTML
+specification allows an HTML entity to have leading
+zeroes which the browser ignores; the specification
+also allows for code points to be expressed in
+hexadecimal. Thus, to defeat simple exact-match
+greps of HTML artifacts, the blinding service
+can randomly replace native characters with random
+HTML entity equivalents.
+
+There are a variety of more sophisticated techniques
+to obfuscate HTML and CSS. For a fuller exploration
+of these topics, we defer the reader to other
+work~\cite{webAppObfuscation}. Our blinding service
+prototype uses random HTML entity mutation. It also
+obscures the HTML structure of the page using
+randomly inserted tags which do not affect the
+user-perceived visual layout of the page.\\
+
+\noindent
+{\bf Images:} The blinding service can automatically
+mutate images in several ways. For example, the
+blinding service can select one of several formats
+for a returned image (e.g., JPEG, PNG, GIF, etc.).
+Each instantiation of the image can have a different
+resolution, as well as different filters that are
+applied to different parts of the visual spectrum.
+Web developers can also use application-specific
+knowledge to generate more aggressive mutations,
+such as splitting a single base image into two
+semi-transparent images that are stacked atop each
+other by client-side JavaScript. %!!!Can you actually do this? :-)
+As explained in our threat model (\S\ref{sec:threatModel}),
+Veil does not protect against leaks of the raw
+display bitmap that resides in GPU memory; thus,
+the mutation techniques from above are sufficient
+to thwart grep-based forensics on memory artifacts from
+the DOM tree. For a more thorough discussion
+of image mutation techniques that thwart
+classification algorithms, we defer to literature
+from the computer vision community~\cite{biggio11}.\\
+
+% Orphan text that was removed from the intro.
+% 
+% To implement blinded references, Veil introduces a new
+% set of \emph{blinding servers}. These servers sit between
+% between users and application developers. Developers
+% upload hash-named content to blinding servers, and users
+% load a target page using Veil's bootstrap page, which
+% gathers blinded objects via HTTP and uses them to
+% dynamically reconstruct the target page. Blinding servers
+% assist with mutating and encrypting content, but their
+% clients can verify the integrity of blinded content
+% using cryptography.
+%
+% From the perspective of a web browser, blinding servers
+% export the standard HTTP interface and look like normal web
+% servers. However, the blinding service can be implemented
+% in multiple ways, e.g., as a distributed hash
+% table~\cite{pastry,chord} or a centralized service run by
+% a trusted authority. In practice, we expect that large
+% groups of privacy-preserving sites will collaboratively
+% pay for cloud VMs that run the blinding service
+% (\S\ref{sec:bservs}). Blinding servers are compatible
+% with per-publisher accounting mechanisms, so Veil can
+% track how much traffic is associated with each Veil
+% site and implement proportional VM billing.
+
+
+% !!!Do we want to mention this?
+% Metamorphic content and Veil strings also allow
+% us to thwart forensics which looks at browser memory
+% consumption to fingerprint pages~\cite{memento}.
+
+\subsubsubsection{Dynamic Content}
+\label{sec:dynamic}
+
+At first glance, Veil's compile-time binding of
+URLs to objects seems to prevent a publisher
+from dynamically generating personalized user
+content. However, Veil can support dynamic
+content generation by using the blinding
+service as a proxy that sits between the
+end-user and the publisher. More specifically,
+a Veil page can issue an HTTP request with
+a \texttt{msg-type} of ``forward''. The body
+of the request contains two things: user information
+like a site-specific Veil cookie (\S\ref{sec:sop}),
+and a publisher name (e.g., \texttt{foo.com}).
+The page gives the request a random hash name,
+since the page will not cache the response.
+When the blinding service receives the request,
+it forwards the message to the publisher's
+dynamic content server. The publisher generates
+the dynamic content from the provided user
+information, and then sends the content to the
+blinding service, who forwards it to the client
+as the HTTP response to the client's ``forward''
+request. The client and the publisher can encrypt
+the user information and the personalized content
+if the blinding service is not trusted with
+user-specific data; in this scenario, the content provider's web server
+is responsible for mutating objects before returning
+them to the client. Regardless, the content provider
+must compile dynamically-generated content (\S\ref{sec:compiler}
+and \S\ref{sec:porting}). Fortunately,
+the compilation cost for a single dynamic object
+is typically small. For example, compiling a
+100 KB image requires Base64-encoding it and
+generating a few metadata fields, taking roughly
+75 ms. Content providers can compile multiple
+dynamic objects in parallel.
+
+\subsubsubsection{DOM Hiding}
+\label{sec:domHiding}
+
+Heap walking reduces the likelihood that in-memory browser
+state will swap to disk. Content mutation ensures that, if
+state does swap out, then the state will not contain greppable
+artifacts from a canonical version of the associated page.
+However, some Veil sites will be uncomfortable with sending
+\emph{any} site-specific HTML, CSS, or JavaScript to a client,
+even if that content is mutated. For example, a site might
+be concerned that a determined sysadmin can inspect swapped-out
+fragments of mutated HTML, and try to reverse-engineer the
+mutation by hand.
+
+To support these kinds of sites, Veil provides a mode of
+operation called DOM hiding. In DOM hiding mode, the user's
+browser essentially acts as a thin client, with the full
+version of the page loaded on a remote server that belongs
+to the content provider. The user's browser employs a generic,
+page-agnostic JavaScript library to forward GUI events to
+the content provider through the blinding service; the content
+provider's machine applies each GUI event to the server-side
+page, and then returns an image that represents the new state
+of the page.
+
+The advantage of DOM hiding is that site-specific HTML, CSS,
+and JavaScript is never pushed to the user's browser. The
+disadvantage is that each GUI interaction now suffers from
+a synchronous wide-area latency. For some Veil sites,
+this trade-off will be acceptable. We characterize the
+additional interactive latency in Section~\ref{sec:dhEval}.
+
+\begin{figure}[t!]
+	\centering
+	\includegraphics{veil-figs/domHiding.pdf}
+	\caption{With DOM hiding, the client-side remoting stub sends
+		GUI events to the content provider, and receives bitmaps
+		representing new page states. The page's raw HTML, CSS,
+		and JavaScript are never exposed to the client.}
+	\label{fig:domHiding}
+\end{figure}
+
+Figure~\ref{fig:domHiding} provides more details about how Veil
+implements DOM hiding. The Veil bootstrap page receives the
+URL to load from the user, as described in Section~\ref{sec:bootstrap}.
+The bootstrap page then issues an initial HTTP request through
+the blinding servers to the content provider.
+The content provider returns a page-agnostic remoting stub;
+this stub merely implements the client-side of the remote
+GUI architecture. As the content provider returns the stub
+to the user, the provider also launches a headless browser\footnote{A
+	headless browser is one that does not have a GUI. However, a
+	headless browser \emph{does} maintain the rest of the browser
+	state; for example, DOM state can be queried using normal DOM
+	methods, and modified through the generation of synthetic DOM
+	events like mouse clicks.} like PhantomJS~\cite{phantomJS} to load
+the normal (i.e., non-rewritten) version of the page. The
+content provider associates the headless browser with a Veil
+GUI proxy. The proxy uses native functionality in the headless
+browser to take an initial screenshot of the page. The GUI
+proxy then sends the initial screenshot via the blinding servers
+to the user's remoting stub. The stub renders the image, and
+uses page-agnostic JavaScript event handlers to detect
+GUI interactions like mouse clicks, keyboard presses, and
+scrolling activity. The stub forwards those events to the GUI
+proxy. The proxy replays those events in the headless
+browser, and ships the resulting screen images back to the
+client. Note that a page which uses DOM hiding will not
+use encrypted client-side browser caching (\S\ref{sec:compiler})
+or DOM storage (\S\ref{sec:sop})---there
+will be no page-specific client-side state to store.
+
+\subsubsection{Discussion}
+\label{sec:discussion}
+
+Veil tries to eliminate cleartext client-side
+evidence of browsing activity. However, Veil does
+not prevent the server-side of a web page from
+tracking user information. Thus, Veil is compatible
+with preexisting workflows for ad generation and
+accounting (although advertising infrastructure
+must be modified to use blinded URLs and
+``forward'' messages).
+
+% jwm: Hmm, on second read, this paragraph doesn't
+%      seem very enlightening . . .
+%
+% Like all programs that perform cryptography, a Veil
+% page is forced to store sensitive keys in cleartext
+% form at certain points during execution. For example,
+% the Veil page must load the cleartext user password into
+% memory before it can decrypt the user's symmetric key;
+% later, the page must use that cleartext symmetric key
+% to decrypt objects that are returned by the blinding
+% service. If an attacker can recover such material from
+% a RAM artifact, it makes it easier to analyze other
+% data that may have leaked from the private session
+% (although content mutation will still present the
+% attacker with challenges). The necessity for cleartext
+% cryptographic keys is problematic, but it seems
+% intrinsic to any program that performs cryptography.
+
+If a Veil page wants to use the browser cache, Veil
+employs encryption to prevent attackers from inspecting
+or modifying cache objects. However, an attacker may
+be able to fingerprint the site by observing the size
+and number of its cached objects. Sun et al.~\cite{sun02} provide a
+survey of techniques which prevent such fingerprinting attacks; 
+their discussion is in the context of
+protecting HTTPS sessions, but their defensive
+techniques are equally applicable to Veil. The strongest
+defense is to reduce the number of objects in a page.
+Veil's compiler can easily do this by inlining objects
+into HTML~\cite{silo}; for example, the compiler can
+directly embed CSS content that the original HTML
+incorporated via a link to an external file. The blinding
+service can also inject noise into the distribution of object
+sizes and counts. For example, when the service returns
+objects to clients, it can pad data sizes to fixed offsets,
+e.g., 2KB boundaries or power-of-2 boundaries. Alternatively,
+the blinding service can map object sizes for page $X$ to
+the distribution for object sizes in a different page
+$Y$~\cite{wright09}. All of these defensive approaches
+hurt performance in some way---inlining and merging
+reduce object cacheability, and padding increases the
+amount of data which must be encrypted and transmitted
+over the network. Note that publishers must explicitly
+enable client-side caching, so paranoid sites can simply
+disable this feature.
+
+%A private web service can inadvertently leak information
+%about its user base via server-side timing channels
+%~\cite{serverTimingAttacks}. For example, suppose that
+%a service's login page requires a user to enter an
+%email address. Further suppose that, on the web server,
+%processing a login with a valid email address takes
+%a different amount of time than processing a login
+%that uses an invalid address. If an attacker knows a
+%user's email address, he can reveal whether the user
+%has visited the private site by navigating to the site
+%himself, performing two login attempts (one with the
+%user's real email address, and another with a fake
+%email address), and observing whether the server-side
+%timing is the same. Veil does not specifically address
+%this attack, but Veil is compatible with solutions
+%like the \texttt{mod\_timepad} Apache module~\cite{serverTimingAttacks}.
