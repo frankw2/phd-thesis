@@ -173,6 +173,154 @@ Our cryptographic assumptions are standard.
 We only assume the existence of one-way functions in our two-provider implementation.
 In our implementation for multiple providers, the security of Paillier encryption~\cite{paillier} is also assumed.
 
+\subsection{Function Secret Sharing}
+\label{sec:queries}
+In this section, we give an overview of Function Secret Sharing (FSS),
+the main primitive used in Splinter, and show how to use it in simple queries.
+Sections~\ref{sec:querymodel} and~\ref{sec:complex} then describe Splinter's full
+query model and our new techniques for more complex queries.
+
+\subsubsection{Overview of Function Secret Sharing}
+\label{sec:fss_overview}
+Function Secret Sharing~\cite{fss} lets a client divide
+a function $f$ into \textit{function shares} 
+$f_1,f_2,\dots,f_k$ so that multiple parties
+can help evaluate $f$ without learning certain of its parameters.
+These shares have the following properties:
+
+\begin{itemize}
+	\item{They are close in size to a description of $f$.}
+	\item{They can be evaluated quickly (similar in time to $f$).}
+	\item{They sum to the original function $f$.
+		That is, for any input $x$, $\sum\limits_{i=1}^k f_i(x) = f(x)$. We 
+		assume that all computations are done over $\mathbb{Z}_{2^m}$, 
+		where $m$ is the number of bits in the output range. }
+	\item{Given any $k-1$ shares $f_i$, an adversary cannot recover the parameters 
+		of $f$.}
+\end{itemize} 
+
+Although it is possible to perform
+FSS for arbitrary functions~\cite{dodis2016spooky}, 
+practical FSS protocols only exist for \emph{point} and \emph{interval} functions.
+These take the following forms:
+\begin{itemize}
+	\item Point functions $f_a$ are defined as $f_a(x)=1$ if $x=a$ or 0 otherwise.
+	\item Interval functions are defined as $f_{a,b}(x)=1$ if $a \le x \le b$ or 0 otherwise.
+\end{itemize}
+
+In both cases, FSS keeps the parameters $a$ and $b$ private: an adversary can tell that
+it was given a share of a point or interval function, but cannot find $a$ and $b$.
+In Splinter, we use the FSS scheme of Boyle et al.~\cite{fss}.
+Under this scheme, the shares $f_i$ for both functions require $O(\lambda n)$ bits to
+describe and $O(\lambda n)$ bit operations to evaluate for a security parameter $\lambda$ (the size
+of cryptographic keys), and $n$ is the number of bits in the input domain.
+%This contrasts to $O(n)$ bits and operations to describe and evaluate the original
+%functions.
+
+\subsubsection{Using FSS for Database Queries}
+\label{sec:fss_queries}
+
+We can use the additive nature of FSS shares to run private queries over
+an entire table in addition to a single data record.
+We illustrate here with two examples.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth]{splinter-figs/fss.pdf}
+	\caption{Overview of how FSS can be applied to database records
+		on two providers to perform a COUNT query.}
+	\label{fig:fss_overview}
+\end{figure}
+
+
+\paragraph{Example: COUNT query.}
+Suppose that the user wants to run the following query on
+a table served by Splinter:
+\begin{verbatim}
+SELECT COUNT(*) FROM items WHERE ItemId = ?
+\end{verbatim}
+
+Here, `\texttt{?}' denotes a parameter that the user would like to keep
+private; for example, suppose the user is searching for \texttt{ItemId = 5},
+but does not want to reveal this value.
+
+To run this query, the Splinter client defines a point function $f(x)=1$ if $x=5$
+or 0 otherwise.
+It then divides this function into function shares $f_1,\dots,f_n$ and
+distributes them to the providers, as shown in Figure~\ref{fig:fss_overview}.
+For simplicity, suppose that there are two providers, who receive shares
+$f_1$ and $f_2$.
+Because these shares are additive, we know that $f_1(x)+f_2(x)=f(x)$
+for every input $x$.
+Thus, each provider $p$ can compute $f_p(\mathrm{ItemId})$ for every ItemId in the
+database table, and send back $r_p = \sum_{i=1}^n f_p(\mathrm{ItemId}_i)$
+to the client.
+The client then computes $r_1 + r_2$, which is equal
+to $\sum_{i=1}^n f(\mathrm{ItemId}_i)$, that is, the count of all matching
+records in the table.
+
+\begin{figure}
+	\centering
+		\begin{tabular}{cccc}
+			\toprule
+			\bf ItemId & \bf Price & $f_1$(ItemId) & $f_2$(ItemId) \\
+			\midrule
+			5 & 8 & 10 & -9 \\
+			1 & 8 & 3 & -3 \\
+			5 & 9 & 10 & -9 \\
+			\bottomrule
+		\end{tabular}
+	\caption[Function Secret Sharing example outputs.]{Simple example table with outputs for the FSS function shares $f_1$, $f_2$ applied to the ItemId column. 
+		The function
+		is a point function that returns 1 if the input is 5, and 0 otherwise.
+		All outputs are integers modulo $2^m$ for some $m$.
+	}
+	\label{fig:fssExample2}
+\end{figure}
+
+To make this more concrete, Figure~\ref{fig:fssExample2} shows an example
+table and some sample outputs of the function shares, $f_1$ and $f_2$,
+applied to the ItemId column. 
+There are a few important observations. First, to each provider,
+the outputs of their function share seem random. Consequently, the provider does not learn
+the original function $f$ and the parameter ``5''. Second, 
+because $f$ evaluates 
+to 1 on inputs of 5, $f_1(\mathrm{ItemId}) + f_2(\mathrm{ItemId}) = 1$ for rows 1 and 3. 
+Similarly, $f_1(\mathrm{ItemId}) + f_2(\mathrm{ItemId})=0$ for row 2.
+Therefore, when summed across the providers, each row
+contributes 1 (if it matches) or 0 (if it does not match) to the 
+final result. 
+Finally, each provider aggregates the outputs of their shares by summing them. 
+In the example, one provider returns 23 to the client, and
+the other returns -21.
+The sum of these is the correct query output, 2.
+
+This additivity of FSS enables Splinter
+to have \textit{low communication costs} for aggregate queries, by aggregating
+data locally on each provider.
+%Adding values locally in the provider 
+%does not leak any information because each value appears random to the provider.
+
+\paragraph{Example: SUM query.}
+Suppose that instead of a COUNT, we wanted to run the following SUM query:
+\begin{verbatim}
+SELECT SUM(Price) FROM items WHERE ItemId=?
+\end{verbatim}
+
+This query can be executed privately with a small extension to the COUNT scheme.
+As in COUNT, we define a point function $f$ for our secret predicate, e.g.,
+$f(x)=1$ if $x=5$ and 0 otherwise.
+We divide this function into shares $f_1$ and $f_2$.
+However, instead of computing
+$r_p = \sum_{i=1}^n f_p(\mathrm{ItemId}_i)$,
+each provider $p$ computes
+$$r_p = \sum_{i=1}^n f_p(\mathrm{ItemId}_i) \cdot \mathrm{Price}_i$$
+
+As before, $r_1 + r_2$ is the correct answer of the query,
+that is, $\sum_{i=1}^n f(\mathrm{ItemId}_i) \cdot \mathrm{Price}_i$.
+We add in each row's price, $\mathrm{Price}_i$, 0 times if the ItemId is equal to 5,
+and 1 time if it does not equal 5.
+
 
 
 
