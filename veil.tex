@@ -394,9 +394,7 @@ example, if the original image tag looked like this:
 \begin{verbatim}
 <img src="http://foo.com/img.jpg"/>
 \end{verbatim}
-\noindent
 the compiler would replace that tag with the following:
-\noindent
 \begin{verbatim}
 <script>obscuraFetch("b6a0d...");</script>
 \end{verbatim}
@@ -1090,7 +1088,7 @@ additional interactive latency in Section~\ref{sec:dhEval}.
 \begin{figure}
 	\centering
 	\includegraphics[width=\textwidth]{veil-figs/domHiding.pdf}
-	\caption{With DOM hiding, the client-side remoting stub sends
+	\caption[Overview of DOM hiding mode]{With DOM hiding, the client-side remoting stub sends
 		GUI events to the content provider, and receives bitmaps
 		representing new page states. The page's raw HTML, CSS,
 		and JavaScript are never exposed to the client.}
@@ -1544,7 +1542,7 @@ object fetch code to refer to the compiler-generated
 object names. Native Veil pages would invoke
 the Veil runtime library to dynamically fetch
 such content, avoiding the need for manual
-rewriting.
+rewriting. \\
 
 \begin{figure}
 	\centering
@@ -1599,7 +1597,7 @@ overheads (see Figures~\ref{fig:cryptoCost} and~\ref{fig:cryptoCostServer}) %!!!
 were paid more frequently. A Veil-optimized
 version of the site would use image spriting~\cite{spriting}
 to combine multiple small images into a single,
-larger one.
+larger one.\\
 
 \noindent
 \textbf{Dynamic content overhead:}
@@ -1611,7 +1609,7 @@ is typically small. For example, compiling a
 100 KB image requires Base64-encoding it and
 generating a few metadata fields, taking roughly
 75 ms. Content providers or blinding servers 
-can compile multiple dynamic objects in parallel.
+can compile multiple dynamic objects in parallel. \\
 
 \begin{figure}
 	\centering
@@ -1645,7 +1643,7 @@ and rewrites variable names to be shorter. HTML
 suffered from larger size increases, because
 mutation tricks like random HTML entity encoding
 strictly increase the number of characters in the
-HTML.
+HTML. \\
 
 \begin{figure}
 	\centering
@@ -1681,13 +1679,13 @@ mode), Veil blinding servers mutate content in
 the background, out of the critical path for an
 HTTP response; thus, the slowdowns in Figure~\ref{fig:scalability}
 are solely caused by synchronous cryptographic
-operations.
+operations. \\
 
 \subsubsection{Preventing Information Leakage}
 \label{sec:privLeaks}
 
-\noindent
-{\bf Name-based Interfaces:} To determine
+
+{\bf Name-based interfaces:} To determine
 how well Veil protects user privacy, we created
 a baseline VM image which ran Lubuntu 13.10 and
 had two different browsers (Firefox and Chrome). In
@@ -1725,6 +1723,7 @@ other URLs were blinded.
 % a new entry to the browser's ``visited pages''
 % history, because the bootstrap page overwrites
 % itself without changing the URL in the address bar.
+\\
 
 \begin{figure}
 	\centering
@@ -1734,7 +1733,7 @@ other URLs were blinded.
 \end{figure}
 
 \noindent
-{\bf Protecting RAM Artifacts:} To determine
+{\bf Protecting RAM artifacts:} To determine
 whether heap walking can prevent secrets from
 paging out, we wrote a C program which gradually
 increases its memory pressure. The program allocates
@@ -1868,7 +1867,8 @@ change will greatly reduce screenshotting overhead.
 \begin{figure}
 	\centering
 	\includegraphics[width=\textwidth]{veil-figs/network_em.pdf}
-	\caption{The impact of emulated network latency on page load
+	\caption[The impact of emulated network latency on page load
+	times.]{The impact of emulated network latency on page load
 		times. In all cases, the download bandwidth cap
 		was 30 Mbps, and the upload bandwidth cap was 10
 		Mbps, emulating a broadband connection. Bandwidth
@@ -1935,7 +1935,7 @@ the cost of reduced security.
 %be layered atop Mylar to provide server-side
 %protections as well.
 
-%\noindent
+%\
 %{\bf Systems Support for Data Privacy:}
 To minimize information leakage via RAM artifacts,
 applications can use best practices like pinning
