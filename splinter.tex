@@ -9,7 +9,8 @@ Many online services let users query large datasets:
 some examples include restaurant sites, stock quotes,
 medical information, and patents. In these services, 
 any user can query the data, and the datasets themselves
-are not sensitive. However, web services can infer a great deal of identifiable and sensitive
+do not contain sensitive user data. 
+However, web services can infer a great deal of identifiable and sensitive
 user information from these queries, such as her 
 political affiliation, sexual orientation, income,
 medical conditions, behavior, etc.~\cite{narayanan2010myths, narayanan2008robust}.
@@ -18,7 +19,7 @@ discriminatory pricing~\cite{amazon-disc-pricing, price-disc2, hannak2014measuri
 For example, online stores have charged users different prices based on location~\cite{price-disc}, and
 travel sites have also increased prices for certain frequently searched flights~\cite{travel-pricing}.
 Even when the services are honest, server compromise and subpoenas can leak the sensitive user
-information on these services~\cite{ravichandran2009capturing, yelp-compromise, twitter-compromise}.
+information collected by these services~\cite{ravichandran2009capturing, yelp-compromise, twitter-compromise}.
 
 This paper presents Splinter, a system that protects users' queries to web applications
 while achieving practical performance for many current web applications.
@@ -68,8 +69,8 @@ We evaluate Splinter by implementing
 three applications over it: a restaurant review site similar to Yelp, 
 airline ticket search, and map routing.
 For all of our applications, Splinter can execute queries in less than 1.6 seconds, at a cost of less than 0.005 cents in server resources on Amazon EC2.
-Splinter's low cost means that providers could profitably run a Splinter-based service
-similar to OpenStreetMap routing~\cite{osm}, an open-source maps service, while only charging users a few dollars per month.
+%Splinter's low cost means that providers could profitably run a Splinter-based service
+%similar to OpenStreetMap routing~\cite{osm}, an open-source maps service, while only charging users a few dollars per month.
 
 %Finally, Splinter does have some limitations.
 %First, FSS, like PIR, requires scanning the whole input dataset on
@@ -109,8 +110,10 @@ security goals, and threat model.
 There are two main principals in Splinter: the \emph{user} and the \emph{providers}.
 Each provider hosts a copy of the data. Providers can 
 retrieve this data from a public repository or mirror site.
-For example, OpenStreetMap~\cite{osm} publishes publicly available 
-map, point-of-interest, and traffic data. 
+Similarly, data owners, like Yelp and Google Maps, can license
+data to be hosted on these providers.
+%For example, OpenStreetMap~\cite{osm} publishes publicly available 
+%map, point-of-interest, and traffic data. 
 For a given user query, all the providers have to run it on the same
 view of the data. Maintaining data consistency
 from mirror sites is beyond the scope of this paper, but
@@ -122,7 +125,7 @@ splits her query into \textit{shares}, using the Splinter client,
 and submits each share to a different provider.
 The user can select any providers of her choice that host the dataset.
 The providers use their shares to execute the user's query 
-over the cleartext public data, using the Splinter provider library. 
+over the cleartext data, using the Splinter provider library. 
 As long as one provider is \textit{honest}
 (does not collude with others), the user's sensitive information in the original query
 remains private. When the user receives the responses from the providers,
@@ -770,7 +773,7 @@ based on the aggregates and condition classes used.
 We note that in all cases, the computation time is $O(n \log n)$ and the communication costs
 are much smaller than the size of the database.
 This makes Splinter practical even for databases with millions of records, which covers
-many common public datasets, as shown in Section~\ref{sec:evaluation}.
+many common web application datasets, as shown in Section~\ref{sec:evaluation}.
 Finally, the main operations used to evaluate Splinter queries at providers, namely sorting
 and sums, are highly parallelizable, letting Splinter take advantage of parallel hardware.
 
@@ -910,7 +913,8 @@ in practice is beyond the scope of this dissertation.
 As shown in Section~\ref{sec:querymodel}, Splinter supports only a subset of SQL.
 Splinter does not support partial text matching or image matching, which are common in types of applications
 that might use Splinter. Moreover, Splinter cannot support private joins, i.e. Splinter can only support joining with 
-another table if the join condition is public. Despite these limitations, our study in Section~\ref{sec:case_studies} 
+another table if the join condition is public, which encompasses a large majority of join operations. 
+Despite these limitations, our study in Section~\ref{sec:case_studies} 
 shows Splinter can support many application search interfaces.
 
 \paragraph{Number of providers:} 
@@ -1023,8 +1027,8 @@ because it allows for SQL-like queries over encrypted data. However, all
 these systems protect against a single, potentially compromised server 
 where the user is storing data privately, but they do not hide data access patterns. 
 In contrast, Splinter hides data access patterns and a user's query parameters 
-but is only designed to operate on a 
-public dataset that is hosted at multiple providers.
+but is only designed to operate on a cleartext 
+datasets that is hosted at multiple providers.
 
 
 \paragraph{ORAM systems:}
@@ -1033,7 +1037,7 @@ ORAM allows a user to read and write data on an untrusted server without
 revealing her data access patterns to the server. However, ORAM cannot be easily applied
 into the Splinter setting. One main requirement of ORAM is that the user
 can only read data that she has written. 
-In Splinter, the provider hosts a public dataset, not created by any specific user, 
+In Splinter, the provider hosts a cleartext dataset, not created by any specific user, 
 and many users need to access the same dataset.
 
 \subsection{Conclusion}
