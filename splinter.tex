@@ -67,7 +67,7 @@ Together, these optimizations let Splinter query datasets with millions of recor
 We evaluate Splinter by implementing 
 three applications over it: a restaurant review site similar to Yelp, 
 airline ticket search, and map routing.
-For all of our applications, Splinter can execute queries in less than 1.6 seconds, at a cost of less than 0.02 cents in server resources on Amazon EC2.
+For all of our applications, Splinter can execute queries in less than 1.6 seconds, at a cost of less than 0.005 cents in server resources on Amazon EC2.
 Splinter's low cost means that providers could profitably run a Splinter-based service
 similar to OpenStreetMap routing~\cite{osm}, an open-source maps service, while only charging users a few dollars per month.
 
@@ -172,6 +172,123 @@ and that the user's Splinter client is uncompromised.
 Our cryptographic assumptions are standard.
 We only assume the existence of one-way functions in our two-provider implementation.
 In our implementation for multiple providers, the security of Paillier encryption~\cite{paillier} is also assumed.
+
+
+
+
+
+\subsection{Discussion and Limitations}
+\label{spl-sec:discussion}
+
+\paragraph{Economic feasibility:}
+\label{sec:disc-economics}
+
+Although it is hard to predict real-world deployment, we believe that Splinter's low cost makes it economically feasible for several types of applications.
+Here are some possible methods for monetization.
+For example, despite many current data owners, such as Yelp and Google Maps, generating revenue primarily by showing ads and mining user data,
+they can license their data to Splinter providers and have these providers manage a Splinter deployment. The providers
+can then charge a subscription fee, e.g. \$1 a month, for usage of the server.
+Similarly, these providers can collectively issue a utility token that
+can be used to pay for the queries.
+Splinter's trust model, where only one provider needs to be honest, also makes 
+it easy for new providers to join the market, increasing users' privacy.
+
+This businesses seems reasonable as studies have shown that 
+many consumers are willing to pay for services that protect their privacy~\cite{atlantic,atlantic2}. 
+In fact, users might not use certain services because of privacy concerns~\cite{ravichandran2009capturing,riley2008tolls}.
+Similarly, more users are using sites like DuckDuckGo and technologies like Tor 
+because they are unwilling to have sites track their
+query behavior, which shows a growing consumer market for privacy-preserving technologies. 
+However, whether such a business model would work or be feasible 
+in practice is beyond the scope of this dissertation.
+%Well-known sites like OkCupid, Pandora, Youtube, and Slashdot allow users to 
+%pay a monthly fee to remove ads that collect their information, showing there is
+%already a demographic willing to pay for privacy. Moreover,
+
+%As shown in Section~\ref{sec:pricing}, the cost of running queries on Splinter is low, with our most expensive query, map routing, costing less than 0.005 cents in AWS resources.
+%At this cost, providers could offer Splinter-based map routing for a subscription fee of \$1 per month.
+%Moreover, the availability of techniques like Splinter might make it easier to introduce 
+%regulation about privacy in certain settings, similar to current privacy regulations in HIPAA~\cite{hipaa}
+%and GDPR~\cite{gdpr}.
+
+%Nonetheless, there are already successful open databases containing most of the data in these services, such as OpenStreetMap~\cite{osm}, and basic data on locations does not change rapidly once collected.
+%There are already multiple Android and iOS applications that download subsets of OpenStreetMap data for  offline routing and update it periodically~\cite{osm-offline}.
+
+%\subsection{Extensions to Splinter}
+%\label{sec:disc-extensions}
+%
+%To support more workloads, Splinter's query model and evaluation algorithms can be extended in several ways.
+
+%Finally, Splinter does have some limitations.
+%First, FSS, like PIR, requires scanning the whole input dataset on
+%every query, to prevent providers from figuring out which records have
+%been accessed.
+%Second, Splinter does not support some SQL features, such as private join conditions.
+%Despite these limitations, we show that Splinter is practical on large
+%real-world datasets, such as maps, and can support many of today's online applications.
+%Because human-created datasets are unlikely to grow faster than
+%hardware capabilities in the future, we believe Splinter's techniques will only
+%become more practical over time.
+
+\paragraph{Unsupported queries:}
+As shown in Section~\ref{sec:querymodel}, Splinter supports only a subset of SQL.
+Splinter does not support partial text matching or image matching, which are common in types of applications
+that might use Splinter. Moreover, Splinter cannot support private joins, i.e. Splinter can only support joining with 
+another table if the join condition is public. Despite these limitations, our study in Section~\ref{sec:case_studies} 
+shows Splinter can support many application search interfaces.
+
+\paragraph{Number of providers:} 
+One limitation of Splinter is that 
+a Splinter-based service has 
+to be deployed on at least two providers. 
+However, previous PIR systems described in Section~\ref{sec:related}
+also require at least two providers. 
+
+%Unlike those systems, 
+%Splinter requires only \textit{one} honest provider whereas those systems
+%require \textit{all} providers be honest. Moreover,
+%current multi-party FSS schemes do not scale well past 
+%three providers, but we believe that further research will improve its efficiency.
+
+%\paragraph{Joins:}
+%As shown in Section~\ref{sec:querymodel}, Splinter can support only joining with another table 
+%if the join condition is public,
+%i.e. the join condition cannot contain sensitive or private information. To do this, 
+%providers can run the join before filtering the data using the private condition.
+%We leave the development of private join conditions to future work.
+
+\paragraph{Full table scans:}
+FSS, like PIR, requires scanning the whole input dataset on every Splinter query,
+to prevent providers from figuring out which records have been accessed. 
+Despite this limitation, we have shown that Splinter is practical
+on large real-world datasets, such as maps.
+
+Splinter needs to scan the whole table only for conditions 
+that contain sensitive parameters.
+For example, consider the query:
+\begin{verbatim}
+SELECT flight from table WHERE src=SFO 
+AND dst=LGA AND delay < 20
+\end{verbatim}
+If the user does not consider the delay of 20 in this query to be
+private, Splinter could send it in the clear.
+The providers can then create an intermediate
+table with only flights where the delay $<$ 20 and apply the private
+conditions only to records in this table.
+In a similar manner, users querying geographic data may be willing to
+reveal their location at the country or state level but would like to
+keep their location inside the state or country private.
+
+\paragraph{Maintaining consistent data views:}
+Splinter requires that each provider executes a given user
+query on the same copy of the data. 
+Much research in distributed systems has focused on ensuring
+databases consistency across multiple providers~\cite{spanner, ongaro:raft, tu:silo}.
+Using the appropriate consistency techniques is dependent
+on the application and an active area of research.
+Applying those techniques in Splinter is beyond the scope
+of this paper.
+
 
 \subsection{Related Work}
 \label{spl-sec:related}
