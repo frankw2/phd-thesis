@@ -695,7 +695,7 @@ if the number of clauses in $c$ is small,
 the user can issue parallel queries for each clause to reduce the communication rounds
 and computation.
 
-\subsection{Extracting Disjoint Records with FSS}
+\subsubsection{Extracting Disjoint Records with FSS}
 \label{sec:sampling}
 
 Here, we describe our sampling-based technique for returning multiple records using FSS, used in TOPK queries with disjoint conditions (Section~\ref{sec:topk}).
@@ -821,7 +821,7 @@ $2.5\times$ speedup over using AES directly as a PRG.
 \subsection{Implementation}
 \label{sec:implementation}
 
-We implemented \sys in C++, using OpenSSL 1.0.2e~\cite{openssl} 
+We implemented Splinter in C++, using OpenSSL 1.0.2e~\cite{openssl} 
 and the AES-NI hardware instructions
 for AES encryption. We used 
 GMP~\cite{gmp} for large integers and OpenMP~\cite{openmp} for multithreading.
@@ -963,9 +963,8 @@ PIR protocols~\cite{ostrovsky2007survey, olumofin2011revisiting}.
 Work has also been done to extend PIR to return multiple records~\cite{groth2010multi},
 but it is computationally expensive.
 Our work is most closely related to the system in~\cite{goldberg}, which implements
-a parametrized SQL-like query model similar to Splinter using PIR. However,
-because this system uses PIR, it has up to $10\times$ more round trips 
-and much higher response times for similar queries. 
+a parametrized SQL-like query model similar to Splinter using PIR, but requires
+more computation than Splinter.
 
 Popcorn~\cite{popcorn} is a media delivery service that 
 uses PIR to hide user consumption habits from the provider
@@ -990,9 +989,9 @@ Even with improvements in practicality~\cite{bellare2013efficient}, these
 techniques still have high computation and bandwidth costs for queries on
 large datasets because a new garbled circuit has to be generated for each query.
 (Reusable garbled circuits~\cite{goldwasser:sfe} are not yet practical.)
-For example, the recent map routing system by Wu et al.~\cite{wu2016} uses garbled circuits and 
-has $100\times$ higher response time and $10\times$ higher bandwidth cost
-than Splinter.
+%For example, the recent map routing system by Wu et al.~\cite{wu2016} uses garbled circuits and 
+%has $100\times$ higher response time and $10\times$ higher bandwidth cost
+%than Splinter.
 
 \paragraph{Encrypted data systems:}
 Systems that compute on encrypted data, like 
