@@ -1,6 +1,10 @@
 \section[Veil: Private Browsing Semantics without Browser-side Assistance]{Veil: Private Browsing Semantics without \\ Browser-side Assistance}
 \label{chap:veil}
 
+This chapter presents Veil, a system that allows web page 
+developers to enforce stronger private browsing semantics without
+browser support.
+
 \subsection{Motivation}
 Web browsers are the client-side execution platform
 for a variety of online services. Many of these
@@ -213,6 +217,9 @@ a developer-side workflow discipline. For example,
 Aurelia~\cite{aurelia}, CoffeeScript~\cite{coffeeScript}, and
 Meteor~\cite{meteor} typically require a
 compilation pass before content can go live.
+To handle dynamic content, blinding servers
+can also help with the compilation process. We
+discuss this in more detail in Section~\ref{sec:dynamic}.
 
 Participating Veil sites must also explicitly serve
 their content from Veil blinding servers. Like
@@ -349,7 +356,7 @@ scope of this paper.
 	\label{fig:arch}
 \end{figure*}
 
-As shown in Figure~1, the Veil framework  %!!!jwm: Arg, the fig ref isn't resolving correctly.
+As shown in Figure~\ref{fig:arch}, the Veil framework  %!!!jwm: Arg, the fig ref isn't resolving correctly.
 consists of three components. The \emph{compiler}
 transforms a normal web page into a new version
 that implements static and dynamic privacy protections.
@@ -377,7 +384,7 @@ dynamically fetch and generate new content.
 \subsubsection{The Veil Compiler and veilFetch()}
 \label{sec:compiler}
 
-The compiler processes the HTML in our example page (Figure~1),
+The compiler processes the HTML in our example page (Figure~\ref{fig:arch}),
 and finds references to three external objects (i.e.,
 the CSS file, the JavaScript file, and the image).
 The compiler computes a hash value for each object,
@@ -1012,13 +1019,41 @@ user-specific data; in this scenario, the content provider's web server
 is responsible for mutating objects before returning
 them to the client. Regardless, the content provider
 must compile dynamically-generated content (\S\ref{sec:compiler}
-and \S\ref{sec:porting}). Fortunately,
-the compilation cost for a single dynamic object
-is typically small. For example, compiling a
-100 KB image requires Base64-encoding it and
-generating a few metadata fields, taking roughly
-75 ms. Content providers can compile multiple
-dynamic objects in parallel.
+and \S\ref{sec:porting}).
+
+Another option is to start with the same forwarding
+protocol as above, but instead of having
+the publisher compile and mutate the content, the 
+publisher just sends the unmodified user-specific
+content back to the blinding servers. Then, the blinding
+servers compile and mutate the content before
+returning it to the user. In this scenario, the blinding
+servers do the compilation and mutation. 
+
+The question is which of the two options is better. 
+More specifically, should the proxy (blinding servers
+in our case) or the end host (the publishers) be 
+manipulating content?
+Ideally, the end host
+would manipulate the dynamic content as it might
+contain sensitive user information, which can be 
+encrypted on host and thus hidden from the blinding servers.
+However, the downside is that all end hosts have to 
+adopt Veil. Having the proxy perform the manipulation
+solves this problem, but this scenario would
+require the proxy to handle a heavier computation workload.
+Moreover, the user and end host will expose an additional party, i.e. 
+the proxy, to her sensitive information since the
+proxy has to have access to the cleartext content.
+The networking community
+has examined these tradeoffs in a similar context, 
+so we refer you to that specific research for a more in-depth
+discussion~\cite{flywheel,polaris}.
+Fortunately, there is not a significant
+performance difference between the two options. 
+The performance overhead is minimal because only the dynamic
+portions of the site have to be compiled during the page load, 
+and more detailed numbers are in Section~\ref{sec:macrobench}.
 
 \subsubsection{DOM Hiding}
 \label{sec:domHiding}
@@ -1414,11 +1449,11 @@ corresponds to non-DOM hiding mode.
 
 Veil uses cryptography to implement blind references
 and protect the data that it places in client-side storage.
-Figure~5 depicts the costs %!!!jwm: For some reason, doing a ~\ref{fig:cryptoCost} doesn't work!
+Figure~\ref{fig:cryptoCost} depicts the costs %!!!jwm: For some reason, doing a ~\ref{fig:cryptoCost} doesn't work!
 for those operations. Before a user can load a Veil
 page, she must generate an AES key and encrypt it
 with the blinding service's RSA key. This one time
-cost is 0.75 ms. The remaining three rows in Figure~5
+cost is 0.75 ms. The remaining three rows in Figure~\ref{fig:cryptoCost}
 depict cryptographic %!!!jwm: For some reason, doing a ~\ref{fig:cryptoCost} doesn't work!
 overheads that Veil incurs during a page load.
 \begin{itemize}
@@ -1560,11 +1595,23 @@ the University site was a challenging case for
 Veil, because the site was small in absolute size,
 but has many small images. Thus,
 Veil's per-blinded-reference cryptographic
-overheads (see Figures~5 and~\ref{fig:cryptoCostServer}) %!!!jwm: See above re: broken fig command.
+overheads (see Figures~\ref{fig:cryptoCost} and~\ref{fig:cryptoCostServer}) %!!!jwm: See above re: broken fig command.
 were paid more frequently. A Veil-optimized
 version of the site would use image spriting~\cite{spriting}
 to combine multiple small images into a single,
 larger one.
+
+\noindent
+\textbf{Dynamic content overhead:}
+As described in Section~\ref{sec:dynamic},
+dynamic content has some overhead because it
+has to be compiled during the page load.
+Fortunately, the compilation cost for a single dynamic object
+is typically small. For example, compiling a
+100 KB image requires Base64-encoding it and
+generating a few metadata fields, taking roughly
+75 ms. Content providers or blinding servers 
+can compile multiple dynamic objects in parallel.
 
 \begin{figure}
 	\centering
