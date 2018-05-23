@@ -159,6 +159,9 @@ Therefore, our performance objective is to minimize computation and communicatio
 For a database of $n$ records, Splinter only requires $O(n \log n)$ computation at the
 providers and $O(\log n)$ communication (Section~\ref{sec:complex}).
 
+\subsubsection{Use Cases}
+
+
 \subsubsection{Threat Model}
 Splinter keeps the parameters in the user's query hidden
 as long as at least one of the user-chosen providers does not collude with others. 
@@ -321,7 +324,512 @@ that is, $\sum_{i=1}^n f(\mathrm{ItemId}_i) \cdot \mathrm{Price}_i$.
 We add in each row's price, $\mathrm{Price}_i$, 0 times if the ItemId is equal to 5,
 and 1 time if it does not equal 5.
 
+\subsection{Splinter Query Model}
+\label{sec:querymodel}
 
+Beyond the simple SUM and COUNT queries in the previous section, 
+we have developed
+protocols to execute a large class of queries using FSS, including
+non-additive aggregates such as MAX and MIN, and queries that return multiple
+individual records instead of an aggregate.
+For all these queries, our protocols are efficient in both
+computation and communication.
+On a database of $n$ records, all queries can be executed in $O(n \log n)$ time
+and $O(\log n)$ communication rounds, and most only require 1 or 2 communication rounds
+(Figure~\ref{fig:complexity} on page~\pageref{fig:complexity}).
+
+\begin{figure}
+	%\small
+	\centering
+	\fbox{
+		\begin{minipage}{0.7\textwidth}
+			\begin{description}
+				\item[\normalfont Query format:] \hspace{1mm} \\
+				SELECT \emph{aggregate}$_1$, \emph{aggregate}$_2$, $\dots$ \\
+				FROM \emph{table}\\
+				WHERE \emph{condition}\\
+				$[$GROUP BY \emph{expr}$_1$, \emph{expr}$_2$, $\dots]$
+				
+				\item[\normalfont \it aggregate:] \mbox{}\\[-1.5\baselineskip]
+				\begin{itemize}
+					\item COUNT | SUM | AVG | STDEV (\emph{expr})
+					\item MAX | MIN (\emph{expr})
+					\item TOPK (\emph{expr}, $k$, \emph{sort\_expr})
+					\item HISTOGRAM (\emph{expr}, \emph{bins})
+				\end{itemize}
+				
+				\item[\normalfont \it condition:] \mbox{}\\[-1.5\baselineskip]
+				\begin{itemize}
+					\item \emph{expr} = \emph{secret}
+					\item \emph{secret}$_1$ $\le$ \emph{expr} $\le$ \emph{secret}$_2$
+					\item AND of `=' conditions and up to one interval
+					\item OR of multiple disjoint conditions\\
+					(e.g., \texttt{country="UK" OR country="USA"})
+				\end{itemize}
+				
+				\item[\normalfont \it expr:] any public function of the fields in a table
+				row\\(e.g., \texttt{ItemId + 1} or \texttt{Price * Tax})
+				
+			\end{description}
+		\end{minipage}
+	}
+	
+	\caption[Splinter query format.]{Splinter query format.
+		The TOPK aggregate returns the top $k$ values of \emph{expr} for matching rows
+		in the query, sorting them by \emph{sort\_expr}.
+		In conditions, the parameters labeled \emph{secret} are hidden from the
+		providers.
+	}
+	\label{fig:suppq}
+\end{figure}
+
+Figure~\ref{fig:suppq} describes Splinter's supported queries using SQL syntax.
+Most operators are self-explanatory.
+The only exception is TOPK, which is used to return up to $k$ individual records
+matching a predicate, sorting them by some expression \emph{sort\_expr}.
+This operator can be used to implement \texttt{SELECT...LIMIT} queries, but
+we show it as a single ``aggregate'' to simplify our exposition.
+To keep the number of matching records hidden from providers, the
+protocol always pads its result to exactly $k$ records.
+
+%Note also that all queries return a bounded amount of data---there is no way to
+%select arbitrarily many rows.
+%This is expected given our security model: if we allowed variable-length
+%results, the providers might learn something about the query from the number
+%of rows sent back.
+
+Although Splinter does not support all of SQL, we found it expressive enough to
+support many real-world query services over public data.
+We examined various websites, including Yelp, Hotels.com, and Kayak, and found
+we can support most of their search features as shown in Section~\ref{sec:case_studies}.
+
+Finally, Splinter only ``natively'' supports fixed-width integer data
+types. However, such integers can also be used to encode strings and
+fixed-precision floating point numbers (e.g., SQL DECIMALs).
+We use them to represent other types of data in our sample applications.
+
+\subsection{Executing Splinter Queries}
+\label{sec:complex}
+
+Given a query in Splinter's query format (Figure~\ref{fig:suppq}), the system executes
+it using the following steps:
+
+\begin{enumerate}
+	\item The Splinter client builds function shares for the condition in the query,
+	as we shall describe in Section~\ref{sec:complex-conditions}.
+	\item The client sends the query with all the secret parameters removed to
+	each provider, along with that provider's share of the condition function.
+	\item If the query has a GROUP BY, each provider divides its data into
+	groups using the grouping expressions; otherwise, it treats the whole table
+	as one group.
+	\item \label{agg-step}
+	For each group and each aggregate in the query, the provider runs an
+	evaluation protocol that depends on the aggregate function and on
+	properties of the condition. We describe these protocols in
+	Section~\ref{sec:complex-aggregates}.
+	Some of the protocols require
+	further communication with the client, in which case the provider
+	batches its communication for all grouping keys together.
+\end{enumerate}
+
+The main challenge in developing Splinter is designing efficient execution protocols
+for Splinter's complex conditions and aggregates (Step~\ref{agg-step}).
+Our contribution is multiple protocols that can execute non-additive
+aggregates with low computation and communication costs.
+
+One key insight that pervades our design is that \emph{the best strategy to
+	compute each aggregate depends on properties of the condition function}.
+For example, if we know that the condition can only match one value of
+the expression it takes as input, we can simply compute the aggregate's result
+for \emph{all} distinct values of the expression in the data, and then use a point
+function to return just one of these results to the client.
+On the other hand, if the condition can match multiple values, we need a
+different strategy that can combine results across the matching values.
+To reason about these properties, we define three \emph{condition classes}
+that we then use in aggregate evaluation.
+
+\subsubsection{Condition Types and Classes}
+\label{sec:complex-conditions}
+
+For any condition $c$, the Splinter client defines a function $f_c$
+that evaluates to 1 on rows where $c$ is true and 0 otherwise, and divides
+$f_c$ into shares for each provider.
+Given a condition $c$, let $E_c = (e_1, \dots, e_t)$ be the list of
+expressions referenced in $c$ (the \emph{expr} parameters in its clauses).
+Because the best strategy for evaluating aggregates depends on $c$, we
+divide conditions into three classes:
+\begin{itemize}
+	\item \emph{Single-value conditions.} These are conditions that can only be
+	true on one combination of the values of $(e_1, \dots, e_t)$.
+	For example, conditions consisting of an AND of `='
+	clauses are single-value.
+	\item \emph{Interval conditions.} These are conditions where the input
+	expressions $e_1,\dots,e_t$ can be ordered such that $c$ is true on an
+	interval of the range of values $e_1||e_2||\dots||e_t$ (where $||$ denotes
+	string concatenation).
+	\item \emph{Disjoint conditions,} i.e., all other conditions.
+\end{itemize}
+
+The condition types described in our query model (Figure~\ref{fig:suppq})
+can all be converted into sharable functions, and categorized into these classes,
+as follows:
+
+\paragraph{Equality-only conditions.}
+Conditions of the form
+$\mathit{e}_1=\mathit{secret}_1$ AND $\dots$ AND
+$\mathit{e}_t=\mathit{secret}_t$
+can be executed as a single point function on the binary string
+$\mathit{e}_1||\dots||\mathit{e}_t$.
+This is simply a point function that can be shared using existing
+FSS schemes~\cite{fss}.
+These conditions are also single-value.
+
+\paragraph{Interval and equality.}
+Conditions of the form
+$\mathit{e}_1=\mathit{secret}_1$ AND $\dots$ AND
+$\mathit{e}_{t-1}=\mathit{secret}_{t-1}$ AND
+$\mathit{secret}_{t} \le \mathit{e}_{t} \le \mathit{secret}_{t+1}$
+can be executed as a single interval function on the binary string
+$\mathit{e}_1||\dots||\mathit{e}_t$.
+This is again supported by existing FSS schemes~\cite{fss}, and is
+an interval condition.
+
+\paragraph{Disjoint OR.}
+Suppose that $c_1,\dots,c_t$ are \emph{disjoint} conditions that can be
+represented using functions $f_{c_1}, \dots, f_{c_t}$.
+Then $c = c_1$ OR$\dots$OR $c_t$ is captured by
+$f_c = f_{c_1} + \dots + f_{c_t}$.
+We share this function across providers by simply giving them shares of
+the underlying functions $f_{c_i}$.
+In the general case, however, $c$ is a disjoint condition where we
+cannot say much about which inputs give 0 or 1.
+
+%\footnote{
+%Note also that adding the $f_i$s does not work for overlapping OR
+%clauses. However, disjoint clauses are still
+%useful for many real-world queries, e.g., searching for restaurants that are
+%either Chinese or Indian.
+%\}
+
+\subsubsection{Aggregate Evaluation}
+\label{sec:complex-aggregates}
+
+%Our aggregate evaluation protocols depend on both the aggregate function and the
+%condition class in the query.
+
+\subsubsubsection{Sum-Based Aggregates}
+To evaluate SUM, COUNT, AVG, STDEV and HISTOGRAM, Splinter
+sums one or more values for each row regardless of the condition
+function class.
+For SUM and COUNT, each provider sums the expression being aggregated or a 1 for each
+row and multiplies it by $f_i(\mathrm{row})$, its share of the condition
+function, as in Section~\ref{sec:fss_queries}.
+Computing AVG($x$) for an expression $x$, requires finding SUM($x$) and COUNT($x$),
+while computing STDEV($x$) requires finding these values and SUM($x^2$).
+Finally, computing a HISTOGRAM into bin boundaries provided by the user simply
+requires tracking one count per bin, and adding each row's result to the
+count for its bin. Note that the binning expression is not
+private---only information about which rows pass the query's condition function.
+
+\subsubsubsection{MAX and MIN}
+\label{sec:min-max}
+Suppose we are given a query to find MAX($e_0$) WHERE $c(e_1,\dots,e_t)$,
+for expressions $e_0,\dots,e_t$.
+The best evaluation strategy depends on the class of the condition $c$.
+
+\paragraph{Single-value conditions.} If $c$ is only true for one combination
+of the values $e_1,\dots,e_t$, each provider starts by evaluating the query
+\begin{Verbatim}[commandchars=\\\{\},codes={\catcode`$=3\catcode`_=8}]
+SELECT MAX($e_0$) FROM data GROUP BY $e_1,\dots,e_t$
+\end{Verbatim}
+This query gives an \emph{intermediate table} with the tuples $(e_1,\dots,e_t)$
+as keys and $\mathrm{MAX}(e_0)$ as values.
+Next, each provider computes $\sum \mathrm{MAX}(e_0) \cdot f_i(e_1,\dots,e_t)$
+across the rows of the intermediate table, where $f_i$ is its share of the
+condition function.
+This sum will add a 0 for each non-matching row and $\mathrm{MAX}(e_0)$ for the
+matching row, thus returning the right value.
+Note that if the original table had $n$ rows, the intermediate table can be built
+in $O(n)$ time and space using a hash table.
+
+\paragraph{Interval conditions.}
+Suppose that $c$ is true if and only if $e_1||\dots||e_t$ is in an interval $[a,b]$,
+where $a$ and $b$ are secret parameters.
+As in the single-value case, the providers can build a data structure that helps
+them evaluate the query without knowing $a$ and $b$.
+%The protocol runs as follows:
+
+In this case, each provider builds an array $A$ of entries $(k,v)$, where the keys are all
+values of $e_1||\dots||e_t$ in lexicographic order, and the values are $\mathrm{MAX}(e_0)$
+for each key.
+It then computes $\mathrm{MAX}(A[i..j])$ for all \emph{power-of-2 aligned} intervals
+of the array $A$ (Figure~\ref{fig:complex-max-tree}).
+This data structure is similar to a Fenwick tree~\cite{fenwick-trees}.
+
+%For example, if $A$ has 6 elements, the provider will compute MAXes on
+%$A[0..1]$, $A[2..3]$, $A[4..5]$ and $A[0..3]$.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth]{splinter-figs/complex_max_tree.pdf}
+	\caption[Data structure for querying MAX on intervals.]{Data structure for querying MAX on intervals.
+		We find the MAX on each power-of-2 aligned interval in the array,
+		of which there are $O(n)$ total.
+		Then, any interval query requires retrieving $O(\log n)$ of these
+		values. For example, to find $MAX(A[3..6])$, we need two
+		size-1 intervals and one size-2.
+	}
+	\label{fig:complex-max-tree}
+\end{figure}
+
+Query evaluation then proceeds in two rounds.
+First, Splinter counts how many keys in $A$ are less than $a$ and how many are less than
+$b$: the client sends the providers shares of the interval functions
+$k \in [0,a-1]$ and $k \in [0,b-1]$, and the providers apply these to all keys $k$
+and return their results.
+This lets the client find indices $i$ and $j$ in $A$
+such that all the keys $k \in [a,b]$ are in $A[i..j]$.
+
+Second, the client sends each provider shares of new point functions that select
+up to two intervals of size 1, up to two intervals of size 2, etc out of the
+power-of-2 sized intervals that the providers computed MAXes on, so as to cover
+exactly $A[i..j]$.
+Note that any integer interval can be covered using at most 2 intervals of each power of 2.
+The providers evaluate these functions to return the MAXes for the selected intervals,
+and the client combines these $O(\log n)$ MAXes to find the overall MAX on $A[i..j]$.\footnote{
+	To hide which sizes of intervals were actually required, the client should always request 2 intervals
+	of each size and ignore unneeded ones.
+}
+
+For a table of size $n$, this protocol requires $O(n \log n)$ time at each provider
+(to sort the data to build $A$, and then to answer $O(\log n)$ point function queries).
+It also only requires two communication rounds, and $O(\log n)$ communication bandwidth.
+The same protocol can be used for other associative aggregates, such as products.
+
+\paragraph{Disjoint conditions.}
+If we must find MAX($e_0$) WHERE $c(e_1,\dots,e_t)$ but know nothing about $c$,
+Splinter builds an array $A$ of all rows in the dataset sorted by $e_0$.
+Finding MAX($e_0$) WHERE $c$ is then equivalent to finding the largest index $i$
+in $A$ such that $c(A[i])$ is true.
+To do this, Splinter uses binary search.
+The client repeatedly sends private queries of the form
+\begin{Verbatim}[commandchars=\\\{\},codes={\catcode`$=3\catcode`_=8}]
+SELECT COUNT(*) FROM $A$
+WHERE $c(e_1,\dots,e_t)$ AND $\mathit{index}\in[\mathit{secret}_1,\mathit{secret}_2],$
+\end{Verbatim}
+where \textit{index} represents the index of each row in $A$ and the interval for it is kept
+private. 
+%(We shall discuss how to do this.)
+By searching for secret intervals in decreasing power-of-2 sizes, the client can find the
+largest index $i$ such that $c(A[i])$ is true.
+For example, if we had an array $A$ of size 8 with largest matching element at $i=5$,
+the client would probe $A[0..3]$, $A[4..7]$, $A[4..5]$, $A[6..7]$ and finally $A[4]$ to
+find that 5 is the largest matching index.
+
+Normally, ANDing the new condition $\mathit{index}\in[\mathit{secret}_1,\mathit{secret}_2]$
+with $c$ would cause problems, because the resulting conditions might no longer be in
+Splinter's supported condition format (ANDs with at most one interval and ORs of
+disjoint clauses).
+Fortunately, because the intervals in our condition are always power-of-2 aligned,
+it can also be written as an equality on the first $k$ bits of \emph{index}.
+For example, supposing that \emph{index} is a 3-bit value, the condition
+$\mathit{index} \in [4,5]$ can be written as $\mathit{index}_{0,1} =$ ``10'', where
+$\mathit{index}_{0,1}$ is the first two bits of \emph{index}.
+This lets us AND the condition into all clauses of $c$.
+
+Once the client has found the largest matching index $i$, it runs one
+more query with a point function to select the row with $index = i$.
+The whole protocol requires $O(\log n)$ communication rounds
+and $O(n \log n)$ computation and works well if $c$ has many conditions. 
+
+However, if $c$ has a small number of OR clauses, an optimization is to run
+one query for each clause in parallel. The user then resolves
+the responses locally to find the answer to the original query.
+Although doing this optimization requires more bandwidth because the returned
+result size is larger, it avoids the $O(\log n)$ communication rounds and 
+the $O(n\log n)$ computation.
+
+\subsubsubsection{TOPK}
+\label{sec:topk}
+Our protocols for evaluating TOPK are similar to those for MAX and MIN.
+Suppose we are given a query to find TOPK($e$, $k$, $e_\mathrm{sort}$) WHERE $c(e_1,\dots,e_t)$.
+The evaluation strategy depends on the class of the condition $c$.
+
+\paragraph{Single-value conditions.} If $c$ is only true for one combination
+of $e_1,\dots,e_t$, each provider starts by evaluating
+\begin{Verbatim}[commandchars=\\\{\},codes={\catcode`$=3\catcode`_=8}]
+SELECT TOPK($e,$ $k,$ $e_\mathrm{sort}$) FROM data
+GROUP BY $e_1,\dots,e_t$
+\end{Verbatim}
+This gives an intermediate table with the tuples $(e_1,\dots,e_t)$
+as keys and TOPK$(\cdot)$ for each group as values, from which we can select
+the single row matching $c$ as in MAX.
+
+\paragraph{Interval conditions.}
+Here, the providers build the same auxiliary array $A$ as
+in MAX, storing the TOPK for each key instead.
+They then compute the TOPKs for power-of-2 aligned intervals in this array.
+The client finds the interval $A[i..j]$ it needs to query, extracts the top $k$ values
+for power-of-2 intervals covering it, and finds the overall top $k$.
+As in MAX, this protocol requires 2 rounds and $O(\log n)$ communication bandwidth.
+
+\paragraph{Disjoint conditions.}
+Finding TOPK for disjoint conditions is different from MAX because we need to return
+multiple records instead of just the largest record in the table that matches $c$.
+This protocol proceeds as follows:
+\begin{enumerate}
+	\item The providers sort the whole table by $e_\mathrm{sort}$ to create an auxiliary array $A$.
+	\item The client uses binary search to find indices $i$ and $j$ in $A$ such that the top $k$
+	items matching $c$ are in $A[i..j]$. This is done the same way as in MAX, but searching for
+	the largest indices where the count of later items matching $c$ is 0 and $k$.
+	\item The client uses a sampling technique (Section~\ref{sec:sampling}) to extract
+	the $k$ records from $A[i..j]$ that match $c$. Intuitively, although we do not know which rows
+	these are, we build a result table of $>k$ values initialized to 0, and add the FSS share
+	for each row of the data to one row in the result
+	table, chosen by a hash. This scheme extracts all matching
+	records with high probability.
+\end{enumerate}
+This protocol needs $O(\log n)$ communication rounds
+and $O(n \log n)$ computation if there are many clauses, but like the protocol for MAX,
+if the number of clauses in $c$ is small,
+the user can issue parallel queries for each clause to reduce the communication rounds
+and computation.
+
+\subsection{Extracting Disjoint Records with FSS}
+\label{sec:sampling}
+
+Here, we describe our sampling-based technique for returning multiple records using FSS, used in TOPK queries with disjoint conditions (Section~\ref{sec:topk}).
+Given a table $T$ of records and a condition $c$ that matches up to $k$ records, we wish to return those records to the client with high probability without revealing $c$.
+
+To solve this problem, the providers each create a result table $R$ of size $l > k$, containing (value, count) columns all initialized to 0.
+They then iterate through the records and choose a result row to update for each record based on a hash function $h$ of its index $i$.
+For each record $r$, each provider adds $1 \cdot f_c(r)$ to $R[h(i)]$.count
+and $r \cdot f_c(r)$ to $R[h(i)]$.value, where $f_c$ is its share of the condition $c$.
+The client then adds up the $R$ tables from all the providers to build up a single table,
+which contains a value and count for all indices that a record matching $c$ hashed into.
+
+Given this information, the client can tell how many records hashed into each
+index: entries with count=1 have only one record, which can be read from the entry's value.
+Unfortunately, entries with higher counts hold multiple records that were added together in
+the value field.
+To recover these entries, the client can run the same process multiple times in parallel with
+different hash functions $h$.
+
+In general, for any given value of $r$ and $k$, the probability of a given record colliding with another under each hash function is a constant (e.g., it is less than $1/3$ for $r=3k$).
+Repeating this process with more hash functions causes the probability to fall exponentially.
+Thus, for any $k$, we can return all the distinct results with high probability using only $O(\log k)$
+hash functions and hence only $O(\log k)$ extra communication bandwidth.
+
+\subsubsection{Complexity}
+
+\begin{figure}
+	\centering
+		\begin{tabular}{ccccc}
+			\toprule
+			\bf Aggregate & \bf Condition & \bf Time & \bf Rounds & \bf Bandwidth \\
+			\midrule
+			Sum-based & any & $O(n)$ & $1$ & $O(1)$ \\
+			\midrule
+			MAX/MIN & 1-value & $O(n)$ & $1$ & $O(1)$ \\
+			MAX/MIN & interval & $O(n \log n)$ & $2$ & $O(\log n)$ \\
+			MAX/MIN & disjoint & $O(n \log n)$ & $O(\log n)$ & $O(\log n)$ \\
+			\midrule
+			TOPK & 1-value & $O(n)$ & $1$ & $O(1)$ \\
+			TOPK & interval & $O(n \log n)$ & $2$ & $O(\log n)$ \\
+			TOPK & disjoint & $O(n \log n)$ & $O(\log n)$ & $O(\log n)$ \\
+			\bottomrule
+		\end{tabular}
+	\caption[Complexity of Splinter's query evaluation protocols.]{Complexity of Splinter's query evaluation protocols for a database of size $n$.
+		For bandwidth, we report the multiplier over the query's normal result size.
+	}
+	\label{fig:complexity}
+\end{figure}
+
+Figure~\ref{fig:complexity} summarizes the complexity of Splinter's query evaluation protocols
+based on the aggregates and condition classes used.
+We note that in all cases, the computation time is $O(n \log n)$ and the communication costs
+are much smaller than the size of the database.
+This makes Splinter practical even for databases with millions of records, which covers
+many common public datasets, as shown in Section~\ref{sec:evaluation}.
+Finally, the main operations used to evaluate Splinter queries at providers, namely sorting
+and sums, are highly parallelizable, letting Splinter take advantage of parallel hardware.
+
+\subsection{Optimized FSS Implementation}
+\label{sec:fastfss}
+
+Apart from introducing new protocols to evaluate complex queries using FSS,
+Splinter includes an FSS implementation optimized for modern hardware.
+In this section, we describe our implementation and also discuss
+how to select the best multi-party FSS scheme for a given query.
+
+The two-party FSS protocol~\cite{fss} is efficient
+because of its use of one-way functions.
+A common class of one-way functions is 
+pseudorandom generators (PRGs)~\cite{levin1987one}, 
+and in practice, 
+AES is the most commonly used PRG because of hardware accelerations,
+i.e. the AES-NI~\cite{aes-ni} instruction. 
+Generally, using AES as a PRG is straightforward (use
+AES in counter mode). However, the use of PRGs 
+in FSS is not only atypical, but it also represents a large portion
+of the computation cost in the protocol. The FSS protocol 
+requires many instantiations 
+of a PRG with different initial seed 
+values, especially in the two-party 
+protocol~\cite{fss}. Initializing multiple PRGs with
+different seed values is very 
+computationally expensive because AES cipher
+initialization is \textit{much slower} than performing
+an AES evaluation on an input. Therefore, 
+the challenge in Splinter is to find an efficient PRG
+for FSS.
+
+Our solution is to use \textit{one-way compression functions}.
+One way compression functions are commonly used as a primitive
+in hash functions, like SHA, and are built using a block
+cipher like AES. In particular, Splinter uses the Matyas-Meyer-Oseas one-way 
+compression function~\cite{matyas1985} because
+this function utilizes a \textit{fixed key} cipher. As a result, 
+the Splinter protocol initializes the cipher only once per query.
+
+More precisely, the Matyas-Meyer-Oseas one-way compression
+function is defined as:
+\begin{equation*}
+F(x) = E_k(x) \oplus x
+\end{equation*}
+where $x$ is the input, i.e. PRG seed value, and $E$ is a block cipher with a fixed key $k$.
+
+The output of a one-way compression function 
+is a fixed number of bits, but we can
+use multiple one-way compression functions with
+different keys and concatenate the outputs to obtain more bits.
+Security is preserved because a function that
+is a concatenation of one-way functions is still a one-way function.
+
+With this one-way compression function, Splinter initializes the cipher, $E_k$,
+at the beginning of the query and reuses it
+for the rest of the query, avoiding
+expensive AES initialization operations in the FSS protocol. 
+For each record, the Splinter protocol 
+needs to perform only $n$ XORs and $n$ AES
+evaluations using the AES-NI instruction, where
+$n$ is the input domain size of the record. 
+In Section~\ref{sec:micro}, we show that Splinter's use of one-way compression functions
+results in a 
+$2.5\times$ speedup over using AES directly as a PRG.
+
+\subsection{Implementation}
+\label{sec:implementation}
+
+We implemented \sys in C++, using OpenSSL 1.0.2e~\cite{openssl} 
+and the AES-NI hardware instructions
+for AES encryption. We used 
+GMP~\cite{gmp} for large integers and OpenMP~\cite{openmp} for multithreading.
+Our optimized FSS library is about 2000 lines of code, and the applications on top of it are about 2000 lines of code. There is around 
+1500 lines of test code to issue the queries. For comparison, 
+we also implement the multi-party
+FSS scheme in~\cite{corrigan-gibbs:riposte} using 2048 bit Paillier encryption ~\cite{paillier}.
+Our FSS library implementation can be found at \url{https://github.com/frankw2/libfss}.
 
 
 
