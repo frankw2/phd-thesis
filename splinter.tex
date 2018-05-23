@@ -89,16 +89,163 @@ similar to OpenStreetMap routing~\cite{osm}, an open-source maps service, while 
 %Splinter is the first system to practically preserve the privacy 
 %of queries on large public datasets.
 
-In summary, our contributions are:
-\begin{itemize}
-	\item{Splinter, a private query system that achieves significantly lower CPU and communication costs than previous systems.}
-	\item{New protocols that extend FSS to complex queries with non-additive aggregates, e.g., TOPK and MAX.}
-	\item{An optimized FSS implementation for modern CPUs.}
-	\item{An evaluation of Splinter on realistic applications.}
-\end{itemize}
+%In summary, our contributions are:
+%\begin{itemize}
+%	\item{Splinter, a private query system that achieves significantly lower CPU and communication costs than previous systems.}
+%	\item{New protocols that extend FSS to complex queries with non-additive aggregates, e.g., TOPK and MAX.}
+%	\item{An optimized FSS implementation for modern CPUs.}
+%	\item{An evaluation of Splinter on realistic applications.}
+%\end{itemize}
+
+\subsection{Splinter Architecture}
+\label{sec:goals}
+
+Splinter aims to protect sensitive information in users' queries
+from providers. This section provides an overview of Splinter's architecture,
+security goals, and threat model.
+
+\subsubsection{Splinter Overview}
+\label{sec:model}
+There are two main principals in Splinter: the \emph{user} and the \emph{providers}.
+Each provider hosts a copy of the data. Providers can 
+retrieve this data from a public repository or mirror site.
+For example, OpenStreetMap~\cite{osm} publishes publicly available 
+map, point-of-interest, and traffic data. 
+For a given user query, all the providers have to run it on the same
+view of the data. Maintaining data consistency
+from mirror sites is beyond the scope of this paper, but
+standard techniques can be used~\cite{tewari2002wcdp,chi2008novel}.
+
+As shown in Figure~\ref{fig:overview}, 
+to issue a query in Splinter, a user
+splits her query into \textit{shares}, using the Splinter client,
+and submits each share to a different provider.
+The user can select any providers of her choice that host the dataset.
+The providers use their shares to execute the user's query 
+over the cleartext public data, using the Splinter provider library. 
+As long as one provider is \textit{honest}
+(does not collude with others), the user's sensitive information in the original query
+remains private. When the user receives the responses from the providers,
+she combines them to obtain the final answer to her original query. 
+%In Section~\ref{sec:queries},
+%we will describe in more detail how the user creates these function shares and how
+%the provider uses them to execute the user's query.
+
+\subsubsection{Security Goals}
+\label{sec:query_model}
+The goal of Splinter is to hide sensitive parameters in
+a user's query.
+Specifically, Splinter lets users run \emph{parametrized queries}, 
+where both the parameters and query results are hidden from providers.
+For example, consider the following query, which finds the 10 cheapest flights between a source and destination:
+\begin{verbatim}
+SELECT TOP 10 flightid FROM flights
+WHERE source = ? AND dest = ? 
+ORDER BY price
+\end{verbatim}
+Splinter hides the information represented by the questions marks, i.e.,
+the source and destination in this example.
+The column names being selected and filtered are not hidden.
+Finally, Splinter also hides the query's results---otherwise,
+these might be used to infer the source and destination. 
+Splinter supports a subset of the SQL language, which we describe in Section~\ref{sec:querymodel}.
+
+The easiest way to achieve this property would be for users to download the whole database
+and run the queries locally.
+However, this requires substantial bandwidth and computation for the user.
+Moreover, many datasets change constantly, e.g., to include traffic information or new product reviews.
+It would be impractical for the user to continuously download these updates.
+Therefore, our performance objective is to minimize computation and communication costs.
+For a database of $n$ records, Splinter only requires $O(n \log n)$ computation at the
+providers and $O(\log n)$ communication (Section~\ref{sec:complex}).
+
+\subsubsection{Threat Model}
+Splinter keeps the parameters in the user's query hidden
+as long as at least one of the user-chosen providers does not collude with others. 
+Splinter also assumes these providers are \textit{honest but curious}: a provider can observe the interactions between
+itself and the client, but 
+Splinter does not protect against providers returning incorrect results or maliciously modifying the dataset.
+
+We assume that the user communicates with each provider through a secure channel (e.g., using SSL),
+and that the user's Splinter client is uncompromised. 
+%Protecting attacks on a user's machine are outside of the scope of Splinter.
+Our cryptographic assumptions are standard.
+We only assume the existence of one-way functions in our two-provider implementation.
+In our implementation for multiple providers, the security of Paillier encryption~\cite{paillier} is also assumed.
+
+\subsection{Related Work}
+\label{spl-sec:related}
+Splinter is related to work in Private Information Retrieval (PIR),
+garbled circuit systems, encrypted data systems, 
+and Oblivious RAM (ORAM) systems. Splinter achieves higher performance than these systems 
+through its mapping of database queries to the Function Secret Sharing (FSS) primitive.
+
+\paragraph{PIR systems:}
+Splinter is most closely related to systems that use Private
+Information Retrieval (PIR)~\cite{chor1998private} to query a database privately.
+In PIR, a user queries for the $i^\mathrm{th}$ record in the database, and the database
+does not learn the queried index $i$ or the result.
+Much work has been done on improving 
+PIR protocols~\cite{ostrovsky2007survey, olumofin2011revisiting}. 
+Work has also been done to extend PIR to return multiple records~\cite{groth2010multi},
+but it is computationally expensive.
+Our work is most closely related to the system in~\cite{goldberg}, which implements
+a parametrized SQL-like query model similar to Splinter using PIR. However,
+because this system uses PIR, it has up to $10\times$ more round trips 
+and much higher response times for similar queries. 
+
+Popcorn~\cite{popcorn} is a media delivery service that 
+uses PIR to hide user consumption habits from the provider
+and content distributor. However, Popcorn is optimized for
+streaming media databases, like Netflix, which have a small number (about 8000)
+of large records. 
+
+The systems above have a weaker
+security model: \textit{all} the providers need to be honest.
+Splinter only requires \textit{one} honest provider, and
+it is more practical because it 
+extends Function Secret Sharing (FSS)~\cite{fss,gilboa2014distributed}, which lets
+it execute complex operations such as sums in one round trip
+instead of only extracting one data record at a time.
+
+\paragraph{Garbled circuits:}
+Systems such as Embark~\cite{lan2016embark}, BlindBox~\cite{blindbox}, 
+and private shortest path computation systems~\cite{wu2016}
+use garbled circuits~\cite{Yao, goldwasser1997multi} to perform private computation
+on a single untrusted server.
+Even with improvements in practicality~\cite{bellare2013efficient}, these
+techniques still have high computation and bandwidth costs for queries on
+large datasets because a new garbled circuit has to be generated for each query.
+(Reusable garbled circuits~\cite{goldwasser:sfe} are not yet practical.)
+For example, the recent map routing system by Wu et al.~\cite{wu2016} uses garbled circuits and 
+has $100\times$ higher response time and $10\times$ higher bandwidth cost
+than Splinter.
+
+\paragraph{Encrypted data systems:}
+Systems that compute on encrypted data, like 
+CryptDB~\cite{popa:cryptdb}, Mylar~\cite{popa:mylar}, SPORC~\cite{feldman:sporc},
+Depot~\cite{mahajan:depot}, and SUNDR~\cite{li:sundr}, all try to protect
+private data against a server compromise, which is a different
+problem than what Splinter tries to solve. CryptDB is most similar to Splinter 
+because it allows for SQL-like queries over encrypted data. However, all
+these systems protect against a single, potentially compromised server 
+where the user is storing data privately, but they do not hide data access patterns. 
+In contrast, Splinter hides data access patterns and a user's query parameters 
+but is only designed to operate on a 
+public dataset that is hosted at multiple providers.
+
+
+\paragraph{ORAM systems:}
+Splinter is also related to systems that use Oblivious RAM~\cite{stefanov:path-oram, lorch2013shroud}. 
+ORAM allows a user to read and write data on an untrusted server without
+revealing her data access patterns to the server. However, ORAM cannot be easily applied
+into the Splinter setting. One main requirement of ORAM is that the user
+can only read data that she has written. 
+In Splinter, the provider hosts a public dataset, not created by any specific user, 
+and many users need to access the same dataset.
 
 \subsection{Conclusion}
-\label{sec:conclusion}
+\label{spl-sec:conclusion}
 Splinter is a new private query system that protects sensitive parameters
 in SQL-like queries while scaling to realistic applications. Splinter uses and extends a recent
 cryptography primitive, Function Secret Sharing (FSS),
