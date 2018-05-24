@@ -169,7 +169,8 @@ Although Splinter can handle complex queries, it is not
 meant as a private query system for all SQL-like databases.
 Splinter's use cases are similar to those of PIR. More specifically,
 the queries contain sensitive user information and need to be 
-protected, but the database itself might not be sensitive. 
+protected, but the database itself does not contain
+sensitive user information.
 
 Splinter works well for applications with large databases
 and regular updates because downloading the whole
@@ -181,9 +182,12 @@ Even if it is more efficient for the user to download the whole
 database and updates, Splinter can still be useful.
 Many applications might enforce rate limiting or query restrictions
 to prevent users from accessing the whole database
-because the data might contain proprietary information. For example,
-data owners like Google Maps and Yelp might allow limited querying
-through an API but not give complete access to their dataset.
+because the data might contain proprietary information. However,
+researchers would like to perform data analysis without
+revealing their parameters, which might leak trade secret
+for their algorithms.
+For example, data owners like Google Maps and Yelp might allow limited querying
+for data analysts through an API but not give complete access to their dataset.
 
 \subsubsection{Threat Model}
 Splinter keeps the parameters in the user's query hidden
