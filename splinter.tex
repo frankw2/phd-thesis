@@ -1566,10 +1566,10 @@ of large records.
 
 The systems above have a weaker
 security model: \textit{all} the providers need to be honest.
-Splinter only requires \textit{one} honest provider, and
-it is more practical because it 
-extends Function Secret Sharing (FSS)~\cite{fss,gilboa2014distributed}, which lets
-it execute complex operations such as sums in one round trip
+Splinter requires only \textit{one} honest provider and 
+is more efficient because it 
+extends Function Secret Sharing (FSS)~\cite{fss,gilboa2014distributed}, which 
+enables executions of complex operations such as SUMs in one round trip
 instead of only extracting one data record at a time.
 
 \paragraph{Garbled circuits:}
