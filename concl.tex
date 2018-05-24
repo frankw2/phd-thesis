@@ -1,2 +1,34 @@
 \section{Conclusion and Future Work}
 \label{chap:concl}
+
+In this dissertation, we presented two systems, Veil and Splinter,
+to minimize data leakage when a user accesses a web service. 
+%Veil is the first system that allows developers to provide
+%stronger private browsing semantics without browser-side
+%support. Veil minimizes the amount of user data 
+%that can be recovered on a shared computer after
+%a user terminates her private browsing session.
+%Splinter prevents sensitive information from user
+%queries in a more practical manner by 
+%leveraging a recent cryptographic primitive,
+%function secret sharing (FSS). 
+These systems have raised new interesting questions,
+especially regarding the practicality of 
+systems for secure multi-party computation and private queries.
+
+Splinter leveraged
+function secret sharing (FSS) to reduce the overhead associated with private queries compared to previous
+work. However, open research problems still remain. For example, can private queries scale to billions
+or trillions of records? Furthermore, can private queries support more expressive operators like JOINs or
+NOT conditions? 
+
+Multi-party computation (MPC) allows participants to evaluate a common function without revealing
+their respective inputs. As hospitals, governments, and corporations increasingly transition from
+paper records to electronic ones, MPC-style computations represent a natural way to securely enable
+cross-organization data sharing. MPC is a well-studied cryptographic solution to this problem, but its
+impracticality has prevented widespread adoption. Are there ways to do MPC on more complex
+computations, such as graph queries?
+
+As web services have become more prevalent, it is important to not only think about
+server-side data leakages but also potential leakage through other channels,
+such as the browser and user queries.
