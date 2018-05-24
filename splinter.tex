@@ -165,6 +165,7 @@ we describe in more detail the specific use cases for Splinter.
 %providers and $O(\log n)$ communication (Section~\ref{sec:complex}).
 
 \subsubsection{Use Cases}
+\label{sec:splinter_cases}
 Although Splinter can handle complex queries, it is not
 meant as a private query system for all SQL-like databases.
 Splinter's use cases are similar to those of PIR. More specifically,
@@ -178,16 +179,18 @@ database and receiving updates would be more expensive in terms
 of bandwidth than querying the Splinter service. Services,
 like flight prices, map navigation, stock prices, 
 and domain name availability searches, are good fits for Splinter.
+In Section~\ref{sec:communication}, we discuss and 
+quantify the "break even" point for our case studies.
+
 Even if it is more efficient for the user to download the whole
 database and updates, Splinter can still be useful.
 Many applications might enforce rate limiting or query restrictions
 to prevent users from accessing the whole database
-because the data might contain proprietary information. However,
-researchers would like to perform data analysis without
-revealing their parameters, which might leak trade secret
-for their algorithms.
-For example, data owners like Google Maps and Yelp might allow limited querying
-for data analysts through an API but not give complete access to their dataset. 
+because the data might contain proprietary information. Moreover,
+data analysts would also like to hide their query parameters because
+they might leak trade secret for their algorithms. 
+For example, Yelp might allow limited querying
+for data scientists through an API but not give complete access to their dataset.
 
 \subsubsection{Threat Model}
 Splinter keeps the parameters in the user's query hidden
@@ -1101,7 +1104,8 @@ version requires much less bandwidth.
 	\label{fig:map-results}
 \end{figure}
 
-\paragraph{Communication costs:}
+\subsubsection{Communication Costs}
+\label{sec:communication}
 Figure~\ref{fig:big-results} shows the total bandwidth of a query request and response
 for the various case study queries. The sum of those
 two values represents total bandwidth between the provider and user.
@@ -1115,6 +1119,25 @@ it outputs all the matches for a specific predicate/condition. The user has to p
 the aggregation locally, leading to a larger response size than the two-party protocol.
 Overall, the multi-party protocols have higher total bandwidth compared to the two-party protocols
 despite some differences in response size.
+
+As stated in Section~\ref{sec:splinter_cases}, querying with 
+Splinter and PIR systems should be more efficient than
+downloading the whole database, assuming that such a download is possible
+(no rate limiting or query restrictions). To better quantify
+the "break even" point, i.e. where the communication costs is equal
+to the database size, we look at our case study datasets.
+For Restaurant Q1 and the 2-party version of Q2, 
+it would take 1000-10,000 queries before reaching that point. 
+Users probably query Yelp 1-2 times a day, so it would take at least a year
+to reach the break even point. As a result, it might more sense to use
+Splinter as updates might occur during that time period.
+For Restaurant Q3 and multi-party Q2, it would take about 10-100 queries to reach
+that point. In this case, it might make sense to download the whole database, 
+but improvements to FSS could lower the costs of bandwidth in the future.
+For flights, it would take about 550-100,000 queries, and for maps,
+it would take 2500-25,000 queries. However, these two databases are larger
+than Yelp and change more frequently, so it might not make sense
+to download the database.
 
 %\subsection{Impact of caching FSS outputs}
 %\label{sec:eval_cache}
@@ -1153,7 +1176,8 @@ despite some differences in response size.
 %source-destination pairs, so each provider only needed to perform about 5000 FSS operations
 %per query for a database with 6.1 million rows.]
 
-\paragraph{Coverage of supported queries:}
+\subsubsection{Coverage of Supported Queries}
+\label{sec:supported_queries}
 
 %\begin{figure}[h]
 %\centering
@@ -1482,7 +1506,7 @@ As shown in Section~\ref{sec:querymodel}, Splinter supports only a subset of SQL
 Splinter does not support partial text matching or image matching, which are common in types of applications
 that might use Splinter. Moreover, Splinter cannot support private joins, i.e. Splinter can only support joining with 
 another table if the join condition is public, which encompasses a large majority of join operations. 
-Despite these limitations, our study in Section~\ref{sec:case_studies} 
+Despite these limitations, our study in Section~\ref{sec:supported_queries} 
 shows Splinter can support many application search interfaces.
 
 \paragraph{Number of providers:} 
