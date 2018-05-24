@@ -68,7 +68,7 @@ Together, these optimizations let Splinter query datasets with millions of recor
 We evaluate Splinter by implementing 
 three applications over it: a restaurant review site similar to Yelp, 
 airline ticket search, and map routing.
-For all of our applications, Splinter can execute queries in less than 1.6 seconds, at a cost of less than 0.005 cents in server resources on Amazon EC2.
+For all of our applications, Splinter can execute queries in less than 1.6 seconds, at a cost of less than 0.05 cents in server resources on Amazon EC2.
 %Splinter's low cost means that providers could profitably run a Splinter-based service
 %similar to OpenStreetMap routing~\cite{osm}, an open-source maps service, while only charging users a few dollars per month.
 
@@ -187,7 +187,7 @@ researchers would like to perform data analysis without
 revealing their parameters, which might leak trade secret
 for their algorithms.
 For example, data owners like Google Maps and Yelp might allow limited querying
-for data analysts through an API but not give complete access to their dataset.
+for data analysts through an API but not give complete access to their dataset. 
 
 \subsubsection{Threat Model}
 Splinter keeps the parameters in the user's query hidden
@@ -858,6 +858,570 @@ we also implement the multi-party
 FSS scheme in~\cite{corrigan-gibbs:riposte} using 2048 bit Paillier encryption ~\cite{paillier}.
 Our FSS library implementation can be found at \url{https://github.com/frankw2/libfss}.
 
+\subsection{Evaluation}
+\label{sec:evaluation}
+
+\begin{figure*}
+	\centering
+	\scalebox{0.68}{
+		\begin{tabular}{llllp{1cm}p{2cm}p{2cm}p{1.5cm}}
+			%\multicolumn{8}{c}{Summary of results for Splinter} \\
+			\toprule
+			\bf Dataset & \bf Query Desc. & \bf FSS Scheme & \bf Input Bits & \bf Round Trips & \bf Query Size & \bf Response Size & \bf Response Time \\
+			\midrule
+			\multirow{2}{*}{Restaurant} & \multirow{2}{*}{\parbox{4cm}{COUNT of Thai restaurants (Q1)}} & Two-party & \multirow{2}{*}{11}  & \multirow{2}{*}{1} & \textasciitilde 2.75 KB & \textasciitilde 0.03 KB & 57 ms \\
+			& & Multi-party & & & \textasciitilde 10 KB & \textasciitilde 18 KB & 52 ms \\
+			\midrule
+			\multirow{2}{*}{Restaurant} & \multirow{2}{*}{\parbox{4cm}{Top 10 Mexican restaurants near user (Q2)}} & Two-party & \multirow{2}{*}{22}  & \multirow{2}{*}{1} & \textasciitilde 16.5 KB & \textasciitilde 7 KB & 150 ms \\
+			& & Multi-party & & & \textasciitilde 1.9 MB & \textasciitilde 0.21 KB & 542 ms \\
+			\midrule
+			\multirow{2}{*}{Restaurant} & \multirow{2}{*}{\parbox{4cm}{Best rated restaurant in category subset (Q3)}} & Two-party & \multirow{2}{*}{11}  & \multirow{2}{*}{11} & \textasciitilde 244 KB & \textasciitilde 0.7 KB & 1.3 s \\
+			& & Multi-party & & & \textasciitilde 880 KB & \textasciitilde 396 KB & 1.6 s \\
+			\midrule
+			\multirow{2}{*}{Flights} & \multirow{2}{*}{\parbox{4cm}{AVG monthly price for a certain flight route (Q1)}} & Two-party & \multirow{2}{*}{17} & \multirow{2}{*}{1} & \textasciitilde 8.5 KB & \textasciitilde 0.06 KB & 1.0 s \\
+			& & Multi-party & & & \textasciitilde 160 KB & \textasciitilde 300 KB & 1.2 s \\
+			\midrule
+			\multirow{2}{*}{Flights} & \multirow{2}{*}{\parbox{4cm}{Top 10 cheapest flights for a route (Q2)}} & Two-party & \multirow{2}{*}{13} & \multirow{2}{*}{1} & \textasciitilde 3.25 KB & \textasciitilde 0.3 KB & 30 ms \\
+			& & Multi-party & & & \textasciitilde 20 KB & \textasciitilde 0.13 KB & 39 ms \\
+			\midrule
+			\multirow{2}{*}{Maps} & \multirow{2}{*}{\parbox{4cm}{Routing query on NYC map}} & Two-party & Grid: 14 & \multirow{2}{*}{2} & \textasciitilde 12.5 KB & \textasciitilde 31 KB & 1.2 s \\
+			& & Multi-party & Transit Node: 22 & & \textasciitilde 720 KB & \textasciitilde 1.1 KB & 1.0 s \\
+			\bottomrule
+		\end{tabular}
+	}
+	\caption[Performance results for Splinter case studies.]{Performance of various queries in our case study applications on Splinter. 
+		Response times include 14 ms network latency per network round trip. All subqueries are issued in parallel
+		unless they depend on a previous subquery. Query and response sizes are measured per provider. For the multi-party FSS scheme, we run 3 parties.
+		Input bits represent the number of bits in the input domain for FSS, i.e., the maximum size of a column value.}
+	\label{fig:big-results}
+\end{figure*}
+
+In our evaluation, we aim to answer one main question: can Splinter
+be used practically for real applications? To answer this question,
+we built and evaluated clones of three applications 
+on Splinter: restaurant reviews, flight data, and map routing, using real datasets.
+We also compare Splinter to previous private systems, and estimate hosting costs.
+Our providers ran on 64-core Amazon EC2 \texttt{x1} servers with Intel Xeon E5-2666 Haswell processors and 1.9 TB 
+of RAM. The client was a 2 GHz Intel Core i7 machine with 8 GB of RAM.
+Our client's network latency to the providers was 14 ms.
+
+Overall, our experiments show the following: 
+\begin{itemize}
+	\item{Splinter can support realistic applications including the search features of Yelp and flight search sites, and data structures
+		required for map routing.}
+	\item{Splinter achieves end-to-end latencies below 1.6 sec for queries in these applications on realistic data.}
+	\item{Splinter's protocols use up to 10$\times$ fewer round trips than prior systems and have lower response times.}
+\end{itemize}
+
+
+\subsubsection{Case Studies}
+\label{sec:case_studies}
+
+\begin{figure}
+	\centering
+		\begin{tabular}{cccc}
+			\toprule
+			\bf Dataset & \bf \# of rows & \bf Size (MB) & \bf Cardinality \\
+			\midrule
+			Yelp~\cite{yelp-data} & 225,000 & 23 & 900 categories \\
+			\midrule
+			Flights~\cite{enigma} & 6,100,000 & 225 & 5000 flights \\
+			\midrule
+			\multirow{2}{*}{NYC Map~\cite{dimacs}} & 260,000 nodes & \multirow{2}{*}{300} & \multirow{2}{*}{1333 transit nodes}\\
+			& 733,000 edges & \\
+			\bottomrule
+		\end{tabular}
+	\caption[Datasets used in the evaluation.]{Datasets used in the evaluation. The cardinality of queried columns affects the input bit size in our FSS queries.}
+	\label{fig:datasets}
+\end{figure}
+
+Here, we discuss the three application clones
+we built on Splinter. Figure~\ref{fig:big-results}
+summarizes our results, and Figure~\ref{fig:datasets}
+describes the sizes and characteristics of our three datasets.
+Finally, we also reviewed the search features available in real websites
+to study how many Splinter supports.
+
+\paragraph{Restaurant review site:}
+We implement a restaurant review site using the Yelp academic dataset~\cite{yelp-data}.
+The original dataset contains information for local businesses in 10 cities, 
+but we duplicate the dataset 4 times so that it would approximately represent
+local businesses in 40 cities.
+We use the following columns in the data
+to perform many of the queries expressible on Yelp:
+name, stars, review count, category, neighborhood and location.
+%s, hex-1mi, hex-2mi, hex-5mi.
+%A business might be classified into multiple categories, so there are multiple rows
+%for each business (one for each category). 
+
+For location-based queries, 
+e.g., restaurants within 5 miles of a user's current location, 
+multiple interval conditions on the longitude 
+and latitude would typically be used. 
+To run these queries faster, we quantize the locations of each restaurant into
+overlapping hexagons of different radii (e.g., 1, 2 and 5 miles), following
+the scheme from~\cite{narayanan2011location}.
+We precompute which hexagons each restaurant is in and expose these as
+additional columns in the data (e.g., \texttt{hex1mi} and \texttt{hex2mi}).
+This allows the location queries to use `=' predicates instead of intervals.
+
+%\begin{figure}
+%  \centering
+%     \includegraphics[width=0.2\textwidth]{figs/single_hex.pdf}
+%     \caption{Representing a point and radius as three hexagons. The width and height correspond to the radius.}
+%  \label{fig:grid}
+%\end{figure}
+
+%\begin{figure}
+%  \centering
+%     \includegraphics[width=0.25\textwidth]{figs/multiple_hex.pdf}
+%     \caption{Overlay of map with multiple hexagons.}
+%  \label{fig:grid2}
+%\end{figure}
+
+For this dataset, we present results for the following three queries:
+\begin{verbatim}
+Q1: SELECT COUNT(*) WHERE category="Thai"
+
+Q2: SELECT TOP 10 restaurant
+WHERE category="Mexican" AND
+(hex2mi=1 OR hex2mi=2 OR hex2mi=3)
+ORDER BY stars
+
+Q3: SELECT restaurant, MAX(stars) 
+WHERE category="Mexican" OR
+category="Chinese" OR category="Indian"
+OR category="Greek" OR category="Thai"
+OR category="Japanese"
+GROUP BY category
+\end{verbatim}
+
+Q1 is a count on the number of Thai restaurants.
+%In our dataset, we map the category string to an integer id.
+%The input domain is 11 bits for this query because there are 900 categories.
+Q2 returns the top 10 Mexican restaurants within
+a 2 mile radius of a user-specified location by querying three hexagons.
+We assume that the provider caches the intermediate table for the 
+Top 10 query as described in Section~\ref{sec:topk} because it is a common query.
+%The query size is large because the user has to query for restaurants 
+%that match one of the three location hexagons.
+%The input domain is 22 bits for this query (11 bits for the category and 11 bits for 
+%the hexagon id).
+Finally, Q3 returns the best rated restaurant from
+a subset of categories.
+This requires more communication than other queries because 
+it performs a MAX with many disjoint conditions, 
+as described in Section~\ref{sec:min-max}. Although most queries will probably
+not have this many disjoint conditions, we test this query to show
+that Splinter's protocol for this case is also practical.
+
+%Although the intermediate table is smaller, the FSS scheme has to process more bits.
+%Finally, in this query, the slower multi-party FSS with Paillier 
+%and caching previous FSS evaluations during the query are not useful
+%because the intermediate table has distinct values for the predicate
+%describing the category and location.
+
+\paragraph{Flight search:}
+We implement a flight search service similar to Kayak~\cite{kayak}, using 
+a public flight dataset~\cite{enigma}. The columns
+are flight number, origin, destination, month, delay, and price. To find a flight,
+we search by origin-destination pairs. 
+We present results for two queries:
+
+\begin{verbatim}
+Q1: SELECT AVG(price) WHERE month=3 
+AND origin=1 AND dest=2
+
+Q2: SELECT TOP 10 flight_no
+WHERE origin=1 and dest=2 ORDER BY price
+\end{verbatim}
+
+Q1 shows the average price for a flight during a certain month.
+%If we 
+%issue this query for every month, we can obtain a histogram of average prices for the year.
+%In this query, the input domain is 17 bits (13 bits
+%for flight number and 4 bits for the month).
+Q2 returns the top 10 cheapest flights for a given source and destination, which 
+we encode as integers.
+Since this is a common query, the results in Figure~\ref{fig:big-results} 
+assume a cached Top 10 intermediate table. 
+%This query
+%has an input domain of 13 bits.
+
+\paragraph{Map routing:}
+We implement a private map routing service, using real traffic map data from~\cite{dimacs} for New York City.
+However, implementing map routing in Splinter is difficult because the providers can
+perform only a restricted set of operations. The challenge is to find a shortest path 
+algorithm compatible with Splinter. Fortunately,
+%Storing all possible shortest paths requires 
+%substantial amounts of storage. For example, 
+%storing all shortest paths for New York City requires $2^{36}$ rows! 
+%The user could download the map and find the shortest path locally, which
+%is bandwidth heavy, and the user would also have to download updates constantly.
+extensive work has been done to optimize map routing~\cite{bast2015route}.
+One algorithm compatible with Splinter is transit node routing 
+(TNR)~\cite{tnr, bast2007fast}, which has been
+shown to work well in practice~\cite{bast2009ultrafast}. 
+In TNR, the provider divides up a map into grids, 
+which contain at least one transit node, i.e. a transit node 
+that is part of a "fast" path. There is also a separate table
+that has the shortest paths between all pairs of transit nodes, which 
+represent a smaller subset of the map. To execute a shortest path query for a given
+source and destination, the user can use FSS to download the paths
+in her source and destination grid. She locally finds the shortest path to the source transit node
+and destination transit node. Finally, she queries the provider for the shortest path
+between the two transit nodes.
+
+We used the source code from~\cite{tnr} and identified the 1333 transit nodes. We divided the map into 5000 grids,
+and calculated the shortest path for all transit node pairs. The grid table has 5000 rows
+representing the edges and nodes in a grid, and the transit node table has about 800,000
+rows representing the number of shortest paths for all transit node pairs. 
+
+Figure~\ref{fig:big-results} shows the total response time for a routing query
+between a source and destination in NYC. Figure~\ref{fig:map-results} shows
+the breakdown of time spent on querying the grid and transit node table.
+One observation is that the multi-party version is slightly faster than the two party
+version because it is faster at processing the grid query as shown in Figure~\ref{fig:map-results}.
+The two-party version of FSS requires using GMP operations, which is slower than integer operations
+used in the multi-party version, but as shown in Figure~\ref{fig:big-results}, the two-party
+version requires much less bandwidth.
+
+\begin{figure}
+	\centering
+		\begin{tabular}{cccc}
+			\toprule
+			\bf FSS scheme & \bf Grid & \bf Transit Node & \bf Total \\
+			\midrule
+			Two Party & 0.35 s  & 0.85 s & 1.2 s \\
+			Multi-party & 0.15 s & 0.85 s & 1.0 s \\
+			\bottomrule
+		\end{tabular}
+	\caption[Grid, transit node, and total query times for NYC map.]{Grid, transit node, and total query times for NYC map. A user issues 2 grid queries and one transit node query. The two grid queries
+		are issued together in one message, so there are a total of 2 network round trips.}
+	\label{fig:map-results}
+\end{figure}
+
+\paragraph{Communication costs:}
+Figure~\ref{fig:big-results} shows the total bandwidth of a query request and response
+for the various case study queries. The sum of those
+two values represents total bandwidth between the provider and user.
+
+There are two main observations. First, both the query and response sizes are \textit{much smaller} than the size
+of the database. Second, for non-aggregate queries, the multi-party protocol has 
+a smaller response size compared to the two-party protocol but the query size is much larger
+than the two-party protocol, leading to higher overall communication. 
+For aggregate queries, the multi-party FSS scheme is only xor homomorphic, so
+it outputs all the matches for a specific predicate/condition. The user has to perform
+the aggregation locally, leading to a larger response size than the two-party protocol.
+Overall, the multi-party protocols have higher total bandwidth compared to the two-party protocols
+despite some differences in response size.
+
+%\subsection{Impact of caching FSS outputs}
+%\label{sec:eval_cache}
+%In this section, we evaluate the impact of caching FSS outputs in the same query
+%as described in Section~\ref{sec:caching}. One observation is that caching
+%has no effect on certain queries, such as the Top-10 and the map routing queries, because
+%for the commonly queried predicate column in the table, each record has a distinct value.
+%It works well for queries where the predicate column has few distinct values relative to the 
+%number of records, such as the restaurant COUNT and flights AVG query described above.
+%
+%\begin{figure}
+%\centering
+%\small
+%\scalebox{0.85}{
+%\begin{tabular}{ccccc}
+%\toprule
+%\bf Query & \bf FSS scheme & \bf No caching  & \bf Caching & \bf Speedup\\
+%\midrule
+%\multirow{2}{*}{Restaurant Q1} & Two-Party & 271 ms & 57 ms & 4.8x \\
+% & Multi-party & 252 ms & 52 ms & 4.8x\\
+%\multirow{2}{*}{Flight Q2} & Two-Party & 14.6 s & 1.5 s & 9.7x \\
+%& Multi-party & 50.6 s & 1.6 s & 31.6x \\
+%\bottomrule
+%\end{tabular}
+%}
+%\caption{Speed up of queries as a result of caching FSS outputs in the same query.}
+%\label{fig:caching-result}
+%\end{figure}
+%
+%Figure~\ref{fig:caching-result} shows some examples of speed ups of queries as a result
+%of caching FSS outputs in the same query. For the Yelp query, there were only about 900
+%unique categories, so each provider only needed to perform about 900 FSS operations on the 
+%database of 225,000 rows per query. 
+%For the flight query on average price for a specific flight in a month, 
+%there were only about 5000 unique
+%source-destination pairs, so each provider only needed to perform about 5000 FSS operations
+%per query for a database with 6.1 million rows.]
+
+\paragraph{Coverage of supported queries:}
+
+%\begin{figure}[h]
+%\centering
+%\scalebox{0.78}{
+%\begin{tabular}{c|C{3cm}|c}
+%\toprule
+%\bf Website & \bf Splinter Primitive & \bf \# of Search Features \\
+%\midrule
+%\multirow{3}{*}{Yelp} & Equality & 4 \\
+%%\midrule
+% & Range & 2 \\
+%%\midrule
+% & Sorting & 4 \\
+%\midrule
+%\multirow{4}{*}{Hotels.com} & Equality & 3 \\
+%%\midrule
+% & Range & 3 \\
+%%\midrule
+% & Sorting & 4 \\
+% & Not supported & 1 \\
+%\midrule
+%\multirow{3}{*}{Kayak} & Equality & 4 \\
+%%\midrule
+% & Range & 4 \\
+%%\midrule
+% & Not supported & 1 \\ 
+%\midrule
+%Google Maps & Equality & 3 \\
+%\bottomrule
+%\end{tabular}
+%}
+%\caption{Example websites and the number of search features supported by Splinter for a given primitive.}
+%\label{fig:websites}
+%\end{figure}
+
+
+\begin{figure}
+	\centering
+		\begin{tabular}{c|c|c}
+			\toprule
+			\bf Website & \bf Search Feature & \bf Splinter Primitive \\
+			\midrule
+			\multirow{3}{*}{Yelp} & Booking Method, Cities, Distance & Equality \\
+			%\midrule
+			& Price & Range \\
+			%\midrule
+			& Best Match, Top Rated, Most Reviews & Sorting \\
+			& Free text search & --- \\
+			\midrule
+			\multirow{4}{*}{Hotels.com} & Destination, Room type, Amenities & Equality \\
+			%\midrule
+			& Check in/out, Price, Ratings & Range \\
+			%\midrule
+			& Stars, Distance, Ratings, Price & Sorting \\
+			%\midrule
+			& Name contains & --- \\
+			\midrule
+			\multirow{2}{*}{Kayak} & From/To, Cabin, Passengers, Stops & Equality \\
+			%\midrule
+			& Date, Flight time, Layover time, Price & Range \\
+			%\midrule
+			\midrule
+			Google Maps & From/To, Transit type, Route options & Equality \\
+			\bottomrule
+		\end{tabular}
+	\caption{Example website search features and their equivalent Splinter query class.}
+	\label{fig:websites}
+\end{figure}
+
+We also manually characterized the applicability of Splinter to several widely used online services by studying how many of the search fields on these services' interfaces Splinter can support.
+Figure~\ref{fig:websites} shows the results. 
+Most services use equality and range predicates: for example, the
+Hotels.com user interface includes checkboxes for selecting categories, neighborhoods, stars, etc, a range fields for price, and one free-text search field that Splinter does not support.
+In general, all features except free-text search could be supported by Splinter.
+For free-text search, simple keywords that map to a category (e.g., ``grocery store'') could also be supported.
+
+\subsubsection{Comparison to Other Private Query Systems}
+\label{sec:comparison}
+To the best of our knowledge, the most recent
+private query system that can perform a similar class of queries
+as Splinter is that of Olumofin et al.~\cite{goldberg},
+which uses multi-party PIR. Olumofin et al. creates
+an $m$-ary ($m=4$) B+ index tree for the dataset and
+uses PIR to search through
+it to return various results. As a result, their queries
+require $O(\log_m n)$ round trips, where $n$ is
+the number of records. In Splinter, the number of rounds trips
+does not depend on the size of the database for most queries.
+As shown in Section~\ref{sec:min-max} and Section~\ref{sec:topk}, 
+the exception is for MIN/MAX and TOPK queries with many disjoint
+conditions where Splinter's
+communication is similar; if there are a small number of disjoint
+conditions, Splinter will be faster than previous systems 
+because the user can issue parallel queries.
+
+Figure~\ref{fig:rt-comparison} shows 
+the round trips required in Olumofin et al.'s system and in Splinter
+for the queries in our case studies. Splinter improves over~\cite{goldberg}
+by up to an order of magnitude. Restaurant Q3
+uses a disjoint MAX, so the communication is similar.
+
+We see a similar performance difference from the results
+in~\cite{goldberg}'s evaluation, which reports response times of
+of 2-18 seconds for queries with several million records, compared to
+50 ms to 1.6 seconds in Splinter.
+Moreover, the experiments in~\cite{goldberg} do not use a real network,
+despite having a large number 
+of round trips, so their response times would be even longer
+on high-latency networks.
+Finally, the system in~\cite{goldberg} has weaker security guarantees:
+it requires \textit{all} the providers to be honest, whereas Splinter
+only requires that \textit{one} provider is honest.
+
+For maps, a recent system by Wu et al.~\cite{wu2016} used
+garbled circuits for map routing. They achieve response times
+of 140-784 seconds for their maps with Los Angeles as their largest map,
+and require 8-16 MB of total bandwidth. Splinter has a response time of 1.2
+seconds on a larger map (NYC), which is $100\times$ lower, and with
+a total bandwidth of 45-725 KB, which is $10\times$ lower.
+
+%\begin{figure}
+%\centering
+%\scalebox{0.9}{
+%\begin{tabular}{lcc}
+%\multicolumn{3}{c}{Bytes Transferred}\\
+%\toprule
+%\bf Splinter Query & \bf \cite{goldberg} & \bf Splinter \\
+%\midrule
+%Restaurant Q1 & 3-30 KB & 1 \\
+%\midrule
+%Restaurant Q2 &  & 1 \\ 
+%\midrule
+%Flights Q1 & 22 & 1 \\
+%\midrule
+%Flights Q2 & 12 & 1 \\
+%\midrule
+%Map Routing & 19 & 2 \\
+%\bottomrule
+%\end{tabular}
+%}
+%\caption{For the queries in our evaluation, we show the estimated difference in round trips between Olumofin et al.~\cite{goldberg} and Splinter.}
+%\label{fig:comparison}
+%\end{figure}
+
+\begin{figure}
+	\centering
+		\begin{tabular}{lcc}
+			%\multicolumn{3}{c}{Round Trips (RTs) Required}\\
+			\toprule
+			\bf Splinter Query & \bf RTs in~\cite{goldberg} & \bf RTs in Splinter \\
+			\midrule
+			Restaurant Q1 & 10 & 1 \\
+			\midrule
+			Restaurant Q2 & 6 & 1 \\ 
+			\midrule
+			Restaurant Q3 & 6 & 11 \\
+			\midrule
+			Flights Q1 & 13 & 1 \\
+			\midrule
+			Flights Q2 & 8 & 1 \\
+			\midrule
+			Map Routing & 19 & 2 \\
+			\bottomrule
+		\end{tabular}
+	\caption{For our queries, we show the round trips required for the system of Olumofin et al.~\cite{goldberg} and Splinter.\protect\footnotemark}
+	\label{fig:rt-comparison}
+\end{figure}
+
+\footnotetext{
+	The number of round trips in Restaurant Q3 is $O(\log n)$ in both Splinter and Olumofin et al., but the absolute number is higher in Splinter because we use a binary search whereas Olumofin et al.~use a 4-ary tree. Splinter could also use a 4-ary search to achieve the same number of round trips, but we have not yet implemented this.}
+
+\subsubsection{FSS Microbenchmarks}
+\label{sec:micro}
+Cryptographic operations are the main
+cost in Splinter.
+We present microbenchmarks to show these costs of various
+parts of the FSS protocol, 
+tradeoffs between various FSS protocols,
+and the throughput of FSS. The microbenchmarks
+also show why the response times in Figure~\ref{fig:big-results} 
+are different between the two-party and multi-party FSS cases.
+All of these experiments are done on one core to show the 
+per-core throughput of the FSS protocol.
+
+\paragraph{Two-party FSS:}
+For two-party FSS, generating a function share takes less than 1 ms.
+The speed of FSS evaluation is proportional to the size of the input domain, i.e. number of bits per record. 
+We can perform around 700,000 FSS evaluations per second on
+24-bit records, i.e. process around 700,000
+distinct 24-bit records, using one-way compression functions.
+Figure~\ref{fig:micro2} shows the per-core throughput of our implementation
+for different FSS schemes, i.e. number of unique database records that can be processed
+per second. It also shows that using one-way compression functions
+as described in Section~\ref{sec:fastfss}, we obtain a $2.5\times$ speedup over using 
+AES as a PRG.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth]{splinter-figs/micro.pdf}
+	\caption[Per-core throughput of various FSS protocols.]{Per-core throughput of various FSS protocols. 
+		The graph shows the number of FSS operations that can be performed, i.e. database records processed, per second for various input sizes, on one core.}
+	\label{fig:micro2}
+\end{figure}
+
+
+\paragraph{Multi-party FSS:}
+As shown in Figure~\ref{fig:micro2}, for the multi-party FSS 
+scheme from~\cite{fss} that only uses one-way functions, 
+the time to generate the function share and evaluate it is proportional
+to $2^{n/2}$ where $n$ is the number of bits in the input domain. 
+The size of the share scales with $2^{n/2}$
+rather than just $n$ in the two-party case. 
+An important observation
+is that using one-way compression 
+functions instead of AES does not make a significant difference for multi-party 
+FSS because the PRG is called
+less often compared to two-party FSS. 
+For small input domains ($<$ 20 bits),
+the multi-party version of FSS is faster than the 2-party version, but 
+a provider cannot aggregate locally for SUM and COUNT queries in the multi-party version.
+%However, for smaller input domains, at the
+%cost of additional bandwidth for increased function share size, she will receive faster execution and
+%more security by being able to split her shares.
+
+%\begin{figure}
+%	\centering
+%		\begin{tabular}{cC{2.7cm}C{3cm}}
+%			\multicolumn{3}{c}{Time to generate function shares} \\
+%			\toprule
+%			\bf \# of bits & \bf Query Gen in Boyle et al~\cite{fss} & \bf Query Gen in Riposte~\cite{corrigan-gibbs:riposte}\\
+%			\midrule
+%			8 & $<$ 1 ms  & 0.06 s \\
+%			16 & $<$ 1 ms & 1 s \\
+%			24 & 44 ms & 16 s \\
+%			32 & 166 ms & 265 s \\
+%			\bottomrule
+%		\end{tabular}
+%	\caption{Query generation times for multi-party FSS schemes using one-way functions~\cite{fss} and
+%		using Paillier~\cite{corrigan-gibbs:riposte}.}
+%	\label{fig:mp_querygen}
+%\end{figure}
+%
+%For the scheme from~\cite{corrigan-gibbs:riposte}, which uses Paillier encryption, generating
+%a function share is slower compared to~\cite{fss} because 
+%it requires many exponentiations over a large integer group and 
+%depends on the number of record bits. Figure~\ref{fig:mp_querygen} 
+%shows a summary of the query generation times
+%for both schemes. However, the 
+%evaluation of the function share is independent of the size of
+%the input domain. The output of the function share in~\cite{corrigan-gibbs:riposte}
+%returns a group element that is additive in a large integer group, but in
+%order to have this property, the performance is lower compared to~\cite{fss}.
+%We can perform 250 FSS evaluations a second, but this lower performance 
+%is useful for SUM and COUNT operations on bandwidth-constrained clients.
+
+\subsection{Hosting Costs}
+\label{sec:pricing}
+We estimate Splinter's server-side computation cost on Amazon EC2, 
+where the cost of a CPU-second using Amazon Lambda is about 0.005 cents. 
+The cost of storage and running a web server can be amortized over requests.
+We found that most of our queries cost less than 0.005 cents. Map queries are a bit more costly,
+about 0.05 cents to run a shortest path query for NYC, because the amount of 
+computation required is higher. With the decreasing cost of cloud computing resources~\cite{decrease-aws},
+we expect costs to become even lower over time. Although there are other costs associated with running a web service,
+our results show that Splinter's server-side computation costs are very reasonable.
+%Costs for Amazon AWS and other cloud services have been decreasing because
+%of innovation and competition~\cite{aws-decreasing}, and further improvements to the FSS protocol
+%could also reduce costs. Therefore, we expect our costs per query to decrease over time.
 
 
 \subsection{Discussion and Limitations}
@@ -1044,7 +1608,7 @@ can only read data that she has written.
 In Splinter, the provider hosts a cleartext dataset, not created by any specific user, 
 and many users need to access the same dataset.
 
-\subsection{Conclusion}
+\subsection{Conclusions}
 \label{spl-sec:conclusion}
 Splinter is a new private query system that protects sensitive parameters
 in SQL-like queries while scaling to realistic applications. Splinter uses and extends a recent
