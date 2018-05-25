@@ -1267,7 +1267,20 @@ For free-text search, simple keywords that map to a category (e.g., ``grocery st
 To the best of our knowledge, the most recent
 private query system that can perform a similar class of queries
 as Splinter is that of Olumofin et al.~\cite{goldberg},
-which uses multi-party PIR. Olumofin et al. creates
+which uses multi-party PIR. We simulate our case study queries 
+on their system with similar parameters.
+We compare only two-party Splinter with Olumofin et al.
+because the system of Olumofin et al. assumes only two parties 
+and does not describe how to handle more servers.
+\footnote{From our understanding, it is possible for Olumofin et al. to support
+	more than two parties, but server-side computation and bandwidth would increase
+	substantially, eliminating effects of the optimizations described in the 
+	paper.}
+In particular, we compare Olumofin et al. and Splinter on
+the following three metrics: number of  
+round trips, bandwidth, and server-side computation. 
+
+Olumofin et al. creates
 an $m$-ary ($m=4$) B+ index tree for the dataset and
 uses PIR to search through
 it to return various results. As a result, their queries
@@ -1285,22 +1298,25 @@ Figure~\ref{fig:rt-comparison} shows
 the round trips required in Olumofin et al.'s system and in Splinter
 for the queries in our case studies. Splinter improves over~\cite{goldberg}
 by up to an order of magnitude. Restaurant Q3
-uses a disjoint MAX, so the communication is similar.
+uses a disjoint MAX, so the number of round trips is similar.
+
 Figure~\ref{fig:bandwidth_comp} shows the total bandwidth
 required in Olumofin et al.'s system and in Splinter. Note that
 Olumofin et al. does not have a direct way to support queries with
 disjoint OR conditions used in Restaurant Q3, so we assumed that they issue a separate query
 for each OR condition. Splinter has much lower overall communication
-costs.
+costs. The main reason for this is that the bandwidth
+in PIR depends both on the size of the database and size of a record
+whereas in FSS, the bandwidth depends just on the size of a record.
 
-We see a similar performance difference from the results
-in~\cite{goldberg}'s evaluation, which reports response times of
-of 2-18 seconds for queries with several million records, compared to
-50 ms to 1.6 seconds in Splinter.
-Moreover, the experiments in~\cite{goldberg} do not use a real network,
-despite having a large number 
-of round trips, so their response times would be even longer
-on high-latency networks.
+%We see a similar performance difference from the results
+%in~\cite{goldberg}'s evaluation, which reports response times of
+%of 2-18 seconds for queries with several million records, compared to
+%50 ms to 1.6 seconds in Splinter.
+%Moreover, the experiments in~\cite{goldberg} do not use a real network,
+%despite having a large number 
+%of round trips, so their response times would be even longer
+%on high-latency networks.
 Finally, the system in~\cite{goldberg} has weaker security guarantees:
 it requires \textit{all} the providers to be honest, whereas Splinter
 only requires that \textit{one} provider is honest.
