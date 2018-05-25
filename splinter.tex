@@ -1256,6 +1256,14 @@ For free-text search, simple keywords that map to a category (e.g., ``grocery st
 
 \subsubsection{Comparison to Other Private Query Systems}
 \label{sec:comparison}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=\textwidth]{splinter-figs/bandwidth_comparison.pdf}
+	\caption{For our queries, we show the total bandwidth for Splinter and Olumofin et al~\cite{goldberg}}
+	\label{fig:bandwidth_comp}
+\end{figure}
+
 To the best of our knowledge, the most recent
 private query system that can perform a similar class of queries
 as Splinter is that of Olumofin et al.~\cite{goldberg},
@@ -1278,6 +1286,12 @@ the round trips required in Olumofin et al.'s system and in Splinter
 for the queries in our case studies. Splinter improves over~\cite{goldberg}
 by up to an order of magnitude. Restaurant Q3
 uses a disjoint MAX, so the communication is similar.
+Figure~\ref{fig:bandwidth_comp} shows the total bandwidth
+required in Olumofin et al.'s system and in Splinter. Note that
+Olumofin et al. does not have a direct way to support queries with
+disjoint OR conditions used in Restaurant Q3, so we assumed that they issue a separate query
+for each OR condition. Splinter has much lower overall communication
+costs.
 
 We see a similar performance difference from the results
 in~\cite{goldberg}'s evaluation, which reports response times of
@@ -1291,12 +1305,12 @@ Finally, the system in~\cite{goldberg} has weaker security guarantees:
 it requires \textit{all} the providers to be honest, whereas Splinter
 only requires that \textit{one} provider is honest.
 
-For maps, a recent system by Wu et al.~\cite{wu2016} used
-garbled circuits for map routing. They achieve response times
-of 140-784 seconds for their maps with Los Angeles as their largest map,
-and require 8-16 MB of total bandwidth. Splinter has a response time of 1.2
-seconds on a larger map (NYC), which is $100\times$ lower, and with
-a total bandwidth of 45-725 KB, which is $10\times$ lower.
+%For maps, a recent system by Wu et al.~\cite{wu2016} used
+%garbled circuits for map routing. They achieve response times
+%of 140-784 seconds for their maps with Los Angeles as their largest map,
+%and require 8-16 MB of total bandwidth. Splinter has a response time of 1.2
+%seconds on a larger map (NYC), which is $100\times$ lower, and with
+%a total bandwidth of 45-725 KB, which is $10\times$ lower.
 
 %\begin{figure}
 %\centering
