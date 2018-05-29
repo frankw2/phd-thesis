@@ -1,25 +1,38 @@
 \section{Splinter: Practical, Private Web Application Queries}
 \label{chap:splinter}
 
-This chapter presents Splinter, a practical system that protects user
-queries to web applications.
-
 \subsection{Motivation}
-Many online services let users query large datasets:
-some examples include restaurant sites, stock quotes,
-medical information, and patents. In these services, 
-any user can query the data, and the datasets themselves
-do not contain sensitive user data. 
-However, web services can infer a great deal of identifiable and sensitive
-user information from these queries, such as her 
-political affiliation, sexual orientation, income,
-medical conditions, behavior, etc.~\cite{narayanan2010myths, narayanan2008robust}.
-Web services can use this information maliciously and put users at risk to practices such as
-discriminatory pricing~\cite{amazon-disc-pricing, price-disc2, hannak2014measuring}.
-For example, online stores have charged users different prices based on location~\cite{price-disc}, and
-travel sites have also increased prices for certain frequently searched flights~\cite{travel-pricing}.
-Even when the services are honest, server compromise and subpoenas can leak the sensitive user
-information collected by these services~\cite{ravichandran2009capturing, yelp-compromise, twitter-compromise}.
+
+Web applications are collecting increasing amounts
+of data, and this data contains information useful
+to both users and businesses. For example,
+users can access crowdsourced information,
+such as traffic data to determine the fastest route.
+Similarly, businesses can use this data to better
+understand user behavior and perform analytics. 
+Many of these applications currently allow users
+to query these datasets, but an increasing number
+are allowing businesses and researchers to query
+this data. However, the problem is that 
+queries to this data can reveal sensitive information,
+such as user behavior, identifiable personal information, 
+and business strategy~\cite{narayanan2010myths, narayanan2008robust}.
+
+%Many online services let users query large datasets:
+%some examples include restaurant sites, stock quotes,
+%medical information, and patents. In these services, 
+%any user can query the data, and the datasets themselves
+%do not contain sensitive user data. 
+%However, web services can infer a great deal of identifiable and sensitive
+%user information from these queries, such as her 
+%political affiliation, sexual orientation, income,
+%medical conditions, behavior, etc.~\cite{narayanan2010myths, narayanan2008robust}.
+%Web services can use this information maliciously and put users at risk to practices such as
+%discriminatory pricing~\cite{amazon-disc-pricing, price-disc2, hannak2014measuring}.
+%For example, online stores have charged users different prices based on location~\cite{price-disc}, and
+%travel sites have also increased prices for certain frequently searched flights~\cite{travel-pricing}.
+%Even when the services are honest, server compromise and subpoenas can leak the sensitive user
+%information collected by these services~\cite{ravichandran2009capturing, yelp-compromise, twitter-compromise}.
 
 This dissertation presents Splinter, a system that protects users' queries to web applications
 while achieving practical performance for many current web applications.
@@ -111,13 +124,16 @@ There are two main principals in Splinter: the \emph{user} and the \emph{provide
 Each provider hosts a copy of the data. Providers can 
 retrieve this data from a public repository or mirror site.
 Similarly, data owners, like Yelp and Google Maps, can license
-data to be hosted on these providers.
-%For example, OpenStreetMap~\cite{osm} publishes publicly available 
-%map, point-of-interest, and traffic data. 
+data to be hosted on these providers. In both scenarios,
+the providers store the data in cleartext. 
+
+Users issue queries to the provider.
 For a given user query, all the providers have to run it on the same
 view of the data. Maintaining data consistency
 from mirror sites is beyond the scope of this dissertation, but
 standard techniques can be used~\cite{tewari2002wcdp,chi2008novel}.
+%For example, OpenStreetMap~\cite{osm} publishes publicly available 
+%map, point-of-interest, and traffic data. 
 
 As shown in Figure~\ref{fig:overview}, 
 to issue a query in Splinter, a user
@@ -128,41 +144,11 @@ The providers use their shares to execute the user's query
 over the cleartext data, using the Splinter provider library. 
 As long as one provider is \textit{honest}
 (does not collude with others), the user's sensitive information in the original query
-remains private. When the user receives the responses from the providers,
+remains private. When the user receives the corresponding responses from the providers,
 she combines them to obtain the final answer to her original query. 
 %In Section~\ref{sec:queries},
 %we will describe in more detail how the user creates these function shares and how
 %the provider uses them to execute the user's query.
-
-\subsubsection{Security Goals}
-\label{sec:query_model}
-The goal of Splinter is to hide sensitive parameters in
-a user's query.
-Specifically, Splinter lets users run \emph{parametrized queries}, 
-where both the parameters and query results are hidden from providers.
-For example, consider the following query, which finds the 10 cheapest flights between a source and destination:
-\begin{verbatim}
-SELECT TOP 10 flightid FROM flights
-WHERE source = ? AND dest = ? 
-ORDER BY price
-\end{verbatim}
-Splinter hides the information represented by the questions marks, i.e.,
-the source and destination in this example.
-The column names being selected and filtered are not hidden.
-Finally, Splinter also hides the query's results---otherwise,
-these might be used to infer the source and destination. 
-Splinter supports a subset of the SQL language, which we describe in Section~\ref{sec:querymodel}.
-
-The easiest way to achieve this property would be for users to download the whole database
-and run the queries locally. However, downloading so much data might not 
-be feasible or efficient in terms of bandwidth and computation. Below,
-we describe in more detail the specific use cases for Splinter.
-%However, this requires substantial bandwidth and computation for the user.
-%Moreover, many datasets change constantly, e.g., to include traffic information or new product reviews.
-%It would be impractical for the user to continuously download these updates.
-%Therefore, our performance objective is to minimize computation and communication costs.
-%For a database of $n$ records, Splinter only requires $O(n \log n)$ computation at the
-%providers and $O(\log n)$ communication (Section~\ref{sec:complex}).
 
 \subsubsection{Use Cases}
 \label{sec:splinter_cases}
@@ -192,6 +178,38 @@ they might leak trade secret for their algorithms.
 For example, Yelp might allow limited querying
 for data scientists through an API but not give complete access to their dataset.
 
+\subsubsection{Security Goals}
+\label{sec:query_model}
+The goal of Splinter is to hide sensitive parameters in
+a user's query.
+Specifically, Splinter lets users run \emph{parametrized queries}, 
+where both the parameters and query results are hidden from providers.
+For example, consider the following query, which finds the 10 cheapest flights between a source and destination:
+\begin{verbatim}
+SELECT TOP 10 flightid FROM flights
+WHERE source = ? AND dest = ? 
+ORDER BY price
+\end{verbatim}
+Splinter hides the information represented by the questions marks, i.e.,
+the source and destination in this example.
+The column names being selected and filtered are not hidden.
+Finally, Splinter also hides the query's results---otherwise,
+these might be used to infer the source and destination. 
+Splinter supports a subset of the SQL language, which we describe in Section~\ref{sec:querymodel}.
+Note that the data is in cleartext, and Splinter's goal is not to protect the data on 
+the server side. However, the data owners or providers might have 
+mechanisms in place to limit user access to this data.
+
+The easiest way to achieve this property would be for users to download the whole database
+and run the queries locally. However, as described in Section~\ref{sec:splinter_cases}
+downloading so much data might not be feasible. 
+%However, this requires substantial bandwidth and computation for the user.
+%Moreover, many datasets change constantly, e.g., to include traffic information or new product reviews.
+%It would be impractical for the user to continuously download these updates.
+%Therefore, our performance objective is to minimize computation and communication costs.
+%For a database of $n$ records, Splinter only requires $O(n \log n)$ computation at the
+%providers and $O(\log n)$ communication (Section~\ref{sec:complex}).
+
 \subsubsection{Threat Model}
 Splinter keeps the parameters in the user's query hidden
 as long as at least one of the user-chosen providers does not collude with others. 
@@ -199,12 +217,13 @@ Splinter also assumes these providers are \textit{honest but curious}: a provide
 itself and the client, but 
 Splinter does not protect against providers returning incorrect results or maliciously modifying the dataset.
 
-We assume that the user communicates with each provider through a secure channel (e.g., using SSL),
+We assume the data is in cleartext and that the user communicates with each provider through a secure channel (e.g., using SSL),
 and that the user's Splinter client is uncompromised. 
 %Protecting attacks on a user's machine are outside of the scope of Splinter.
 Our cryptographic assumptions are standard.
 We only assume the existence of one-way functions in our two-provider implementation.
 In our implementation for multiple providers, the security of Paillier encryption~\cite{paillier} is also assumed.
+
 
 \subsection{Function Secret Sharing}
 \label{sec:queries}
