@@ -15,7 +15,7 @@ Many of these applications currently allow users
 to query these datasets, but an increasing number
 are allowing businesses and researchers to query
 this data. However, the problem is that 
-queries to this data can reveal sensitive information,
+these queries can reveal sensitive information,
 such as user behavior, identifiable personal information, 
 and business strategy~\cite{narayanan2010myths, narayanan2008robust}.
 
@@ -35,8 +35,9 @@ and business strategy~\cite{narayanan2010myths, narayanan2008robust}.
 %Even when the services are honest, server compromise and subpoenas can leak the sensitive user
 %information collected by these services~\cite{ravichandran2009capturing, yelp-compromise, twitter-compromise}.
 
-This dissertation presents Splinter, a system that protects users' queries to web applications
-while achieving practical performance for many current web applications.
+This dissertation presents Splinter, a practical system that allows servers
+to properly respond to user queries without learning the sensitive information 
+present in the queries.
 In Splinter, the user divides each query into shares and sends them to different
 \emph{providers}, which are services hosting a copy of the dataset (Figure~\ref{fig:overview}).
 As long as any one of the providers is honest and does not
@@ -60,7 +61,9 @@ can compute the answer to her query.
 
 Previous private query systems have generally not achieved practical performance
 because they use expensive cryptographic primitives and protocols.
-For example, systems based on Private Information Retrieval (PIR)~\cite{goldberg,chor1997private,pir-search} require many round trips and high bandwidth for complex queries, while systems based on garbled
+For example, systems based on other cryptographic techniques such
+as Private Information Retrieval (PIR)~\cite{goldberg,chor1997private,pir-search} 
+require many round trips and high bandwidth for complex queries, while systems based on garbled
 circuits~\cite{wu2016,lan2016embark,ben2008fairplaymp} have a high computational cost.
 These approaches are especially costly for mobile clients on high-latency networks.
 
@@ -68,7 +71,8 @@ Instead, Splinter is the first system to use and extend a recent cryptographic p
 Function Secret Sharing (FSS)~\cite{fss, gilboa2014distributed} for private queries.
 FSS allows the client to split certain functions into shares that keep parameters of the
 function hidden unless all the providers collude.
-With judicious use of FSS, many queries can be answered at low CPU and bandwidth cost in only a single network round trip.
+With judicious use of FSS, many queries can be answered in only a single network round trip
+with low CPU and bandwidth costs.
 
 Splinter makes two contributions over previous work on FSS.
 First, prior work has only demonstrated efficient FSS protocols for point and interval functions with additive aggregates such as SUMs~\cite{fss}.
@@ -158,7 +162,11 @@ meant as a private query system for all SQL-like databases.
 Splinter's use cases are similar to those of PIR. More specifically,
 the queries contain sensitive user information and need to be 
 protected, but the database itself does not contain
-sensitive user information.
+sensitive user information. For example, users might not
+want to reveal where they are traveling to Google when searching
+for directions. Similarly, data analysts might want to hide
+their query parameters because they might leak trade
+secrets for their algorithms.
 
 Splinter works well for applications with large databases
 and regular updates because downloading the whole
@@ -173,11 +181,9 @@ Even if it is more efficient for the user to download the whole
 database and updates, Splinter can still be useful.
 Many applications might enforce rate limiting or query restrictions
 to prevent users from accessing the whole database
-because the data might contain proprietary information. Moreover,
-data analysts would also like to hide their query parameters because
-they might leak trade secret for their algorithms. 
+because the data might contain proprietary information.
 For example, Yelp might allow limited querying
-for data scientists through an API but not give complete access to their dataset.
+for data scientists through an API but not give complete access to their dataset. 
 
 \subsubsection{Security Goals}
 \label{sec:query_model}
