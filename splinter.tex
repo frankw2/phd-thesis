@@ -1135,7 +1135,7 @@ version requires much less bandwidth.
 \label{sec:communication}
 Figure~\ref{fig:big-results} shows the total bandwidth of a query request and response
 for the various case study queries. The sum of those
-two values represents total bandwidth between the provider and user.
+two values represents total bandwidth between the providers and user.
 
 There are two main observations. First, both the query and response sizes are \textit{much smaller} than the size
 of the database in most cases. 
@@ -1146,8 +1146,10 @@ For aggregate queries, the multi-party FSS scheme is only xor homomorphic, so
 it outputs all the matches for a specific predicate/condition. The user has to perform
 the aggregation locally, leading to a larger response size than the two-party protocol.
 Overall, the multi-party protocols have higher total bandwidth compared to the two-party protocols
-despite some differences in response size. However, we believe that improvements in multi-party 
-FSS will lower these communication costs in the future.
+despite some differences in response size. However, FSS is a relatively new cryptographic
+primitive, especially compared to PIR and garbled circuits, so we believe that
+improvements in multi-party FSS protocol could 
+lower these communication costs in the future.
 
 As stated in Section~\ref{sec:splinter_cases}, querying with 
 Splinter and PIR systems should be more efficient than
@@ -1573,7 +1575,7 @@ shows Splinter can support many application search interfaces.
 One limitation of Splinter is that 
 a Splinter-based service has 
 to be deployed on at least two providers. 
-However, previous PIR systems described in Section~\ref{sec:related}
+However, previous practical PIR systems described in Section~\ref{spl-sec:related}
 also require at least two providers. 
 
 %Unlike those systems, 
