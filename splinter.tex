@@ -1138,14 +1138,16 @@ for the various case study queries. The sum of those
 two values represents total bandwidth between the provider and user.
 
 There are two main observations. First, both the query and response sizes are \textit{much smaller} than the size
-of the database. Second, for non-aggregate queries, the multi-party protocol has 
+of the database in most cases. 
+Second, for non-aggregate queries, the multi-party protocol has 
 a smaller response size compared to the two-party protocol but the query size is much larger
 than the two-party protocol, leading to higher overall communication. 
 For aggregate queries, the multi-party FSS scheme is only xor homomorphic, so
 it outputs all the matches for a specific predicate/condition. The user has to perform
 the aggregation locally, leading to a larger response size than the two-party protocol.
 Overall, the multi-party protocols have higher total bandwidth compared to the two-party protocols
-despite some differences in response size.
+despite some differences in response size. However, we believe that improvements in multi-party 
+FSS will lower these communication costs in the future.
 
 As stated in Section~\ref{sec:splinter_cases}, querying with 
 Splinter and PIR systems should be more efficient than
@@ -1332,8 +1334,9 @@ Olumofin et al. does not have a direct way to support queries with
 disjoint OR conditions used in Restaurant Q3, so we assumed that they issue a separate query
 for each OR condition. Splinter has much lower overall communication
 costs. The main reason for this is that the bandwidth
-in PIR depends both on the size of the database and size of a record
-whereas in FSS, the bandwidth depends just on the size of a record.
+in PIR depends both database size (specifically a square root factor) 
+and record size whereas in FSS, the bandwidth depends just on the record size and is
+independent of the database size.
 
 %We see a similar performance difference from the results
 %in~\cite{goldberg}'s evaluation, which reports response times of
