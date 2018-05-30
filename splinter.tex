@@ -1118,7 +1118,9 @@ version requires much less bandwidth.
 			Multi-party & 0.15 s & 0.85 s & 1.0 s \\
 			\bottomrule
 		\end{tabular}
-	\caption[Grid, transit node, and total query times for NYC map.]{Grid, transit node, and total query times for NYC map. A user issues 2 grid queries and one transit node query. The two grid queries
+	\caption[Grid, transit node, and total query times for NYC map.]
+	{Grid, transit node, and total query times for NYC map. 
+		A user issues 2 grid queries and one transit node query. The two grid queries
 		are issued together in one message, so there are a total of 2 network round trips.}
 	\label{fig:map-results}
 \end{figure}
@@ -1293,8 +1295,7 @@ because the system of Olumofin et al. assumes only two parties
 and does not describe how to handle more servers.
 \footnote{From our understanding, it is possible for Olumofin et al. to support
 	more than two parties, but server-side computation and bandwidth would increase
-	substantially, eliminating effects of the optimizations described in the 
-	dissertation.}
+	substantially, eliminating effects of the optimizations described in their paper.}
 In particular, we compare Olumofin et al. and Splinter on
 the following three metrics: number of  
 round trips, bandwidth, and server-side computation. 

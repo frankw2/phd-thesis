@@ -1,9 +1,9 @@
 \section[Veil: Private Browsing Semantics without Browser-side Assistance]{Veil: Private Browsing Semantics without \\ Browser-side Assistance}
 \label{chap:veil}
 
-This chapter presents Veil, a system that allows web page 
-developers to enforce stronger private browsing semantics without
-browser support.
+%This chapter presents Veil, a system that allows web page 
+%developers to enforce stronger private browsing semantics without
+%browser support.
 
 \subsection{Motivation}
 Web browsers are the client-side execution platform
@@ -86,7 +86,7 @@ heap walking, DOM hiding, and state encryption.
 	URLs. The compiler also injects a runtime
 	library into each page; this library interposes
 	on dynamic content fetches (e.g., via
-	Veil{XMLHttpRequests}), and forces those
+	\texttt{XMLHttpRequests}), and forces those
 	requests to also use blinded references.
 	\item The compiler uploads the objects in a web page to
 	Veil's \emph{blinding servers}. A user's browser
@@ -217,7 +217,8 @@ a developer-side workflow discipline. For example,
 Aurelia~\cite{aurelia}, CoffeeScript~\cite{coffeeScript}, and
 Meteor~\cite{meteor} typically require a
 compilation pass before content can go live.
-To handle dynamic content, blinding servers
+To handle dynamic content that results from 
+personalization on a webpage, blinding servers
 can also help with the compilation process. We
 discuss this in more detail in Section~\ref{sec:dynamic}.
 
@@ -264,7 +265,7 @@ out-of-scope for this dissertation.
 Veil models the post-session attacker as a skilled
 system administrator who knows the location and purpose
 of the swap file, the browser cache, and files like
-Veil{/var/log/*} that record network activity
+\texttt{/var/log/*} that record network activity
 like DNS resolution requests. Such an attacker can
 use tools like \texttt{grep} or \texttt{find} to
 look for hostnames, file types, or page content that
@@ -315,7 +316,7 @@ that a browser contacts~\cite{aggarwal10}). It is
 acceptable for the attacker to learn that a user
 has contacted Veil's blinding servers---those
 servers form a large pool whose hostnames are generic
-(e.g., \texttt{Veil.io}) and do not reveal
+(e.g., \texttt{veil.io}) and do not reveal
 any information about particular Veil sites
 (\S\ref{sec:bservs}).
 
@@ -363,7 +364,7 @@ that implements static and dynamic privacy protections.
 Web developers upload the compiler's output to
 \emph{blinding servers}. These servers act as
 intermediaries between content publishers and
-content users, mutating and encrypting content. To load the Veil
+content users, encrypting content. To load the Veil
 page, a user first loads a small \emph{bootstrap page}.
 The bootstrap asks for a per-user key and the
 URL of the Veil page to load; the bootstrap then
@@ -525,7 +526,7 @@ root objects change over time as the associated
 HTML evolves. Thus, root objects are
 signed by the publisher to guarantee
 authenticity and allow the blinding service
-to reject fradulent updates.
+to reject fraudulent updates.
 
 
 \subsubsection{The Blinding Service}
@@ -867,7 +868,13 @@ object, the blinding server can late-bind
 the mutated version that the page references.
 Using this approach, mutation costs need not
 be synchronous overheads that are paid when
-a client requests a page.\\
+a client requests a page. In addition, 
+when a user requests a Veil page,
+the blinding servers update the corresponding 
+hashes for the mutated objects in the root object
+before sending it to the user
+to preserve the self-verification property of 
+Veil objects described in Section~\ref{sec:compiler}. \\
 
 \noindent
 {\bf JavaScript:} To mutate JavaScript files, the
@@ -1025,13 +1032,11 @@ the publisher compile and mutate the content, the
 publisher just sends the unmodified user-specific
 content back to the blinding servers. Then, the blinding
 servers compile and mutate the content before
-returning it to the user. In this scenario, the blinding
-servers do the compilation and mutation. 
+returning it to the user. 
 
 The question is which of the two options is better. 
-More specifically, should the proxy (blinding servers
-in our case) or the end host (the publishers) be 
-manipulating content?
+More specifically, should the blinding servers
+or the publishers perform compilation and mutation?
 Ideally, the end host
 would manipulate the dynamic content as it might
 contain sensitive user information, which can be 
@@ -1040,15 +1045,10 @@ However, the downside is that all end hosts have to
 adopt Veil. Having the proxy perform the manipulation
 solves this problem, but this scenario would
 require the proxy to handle a heavier computation workload.
-Moreover, the user and end host will expose an additional party, i.e. 
-the proxy, to her sensitive information since the
-proxy has to have access to the cleartext content.
 The networking community
 has examined these tradeoffs in a similar context, 
-so we refer you to that specific research for a more in-depth
+so we refer the reader to that specific research for a more in-depth
 discussion~\cite{flywheel,polaris}.
-Fortunately, there is not a significant
-performance difference between the two options. 
 The performance overhead is minimal because only the dynamic
 portions of the site have to be compiled during the page load, 
 and more detailed numbers are in Section~\ref{sec:macrobench}.

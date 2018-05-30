@@ -14,19 +14,20 @@ number of these channels continues to grow. More specifically,
 on the server side, data can leak through data breaches
 or be accessed by malicious service administrators. On the client side,
 sensitive user information can leak from the browser whenever
-a user accesses a web application. This raises an important
+a user accesses a web application. These scenarios raise an important
 question. How do we build secure
 mechanisms to prevent this data leakage?
 
 Much research has focused on building systems~\cite{popa:mylar, popa:cryptdb, li:sundr, feldman:sporc} 
 that protect sensitive user data stored in web application databases
+or cloud providers
 from leaking as a result of data breaches or malicious service
 providers. However, the focus of
 this dissertation is different. We are not protecting sensitive 
 user data that already exists on the server.
 Instead, we build systems
 that prevent data leakage on the client (Veil), specifically
-from the browser, and that protect sensitive user data in queries (Splinter).
+from the browser, and that protect sensitive data in queries (Splinter).
 In the section below, we provide an overview of these two systems.
 
 \subsection{Our Systems}
