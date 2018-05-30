@@ -1333,7 +1333,8 @@ required in Olumofin et al.'s system and in Splinter. Note that
 Olumofin et al. does not have a direct way to support queries with
 disjoint OR conditions used in Restaurant Q3, so we assumed that they issue a separate query
 for each OR condition. Splinter has much lower overall communication
-costs. The main reason for this is that the bandwidth
+costs, especially for the queries on the larger flights and maps
+databases. The main reason for this is that the bandwidth
 in PIR depends both database size (specifically a square root factor) 
 and record size whereas in FSS, the bandwidth depends just on the record size and is
 independent of the database size.
