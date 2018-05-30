@@ -5,18 +5,18 @@ leakage both on the server and client.
 On the server-side, applications collect and analyze
 sensitive user data to monetize it. Consequently,
 this sensitive data can leak through data breaches
-or accessed by malicious database administrators. 
+or can be accessed by malicious service providers. 
 On the client, when a user accesses a web service
 through the browser, sensitive user information
 may leak outside of the browser, 
 e.g., to DNS interfaces or the swap space.
-As a result, an attacker who accesses the user
+An attacker who accesses the user
 device after a session has terminated can view
 this information.
 
 This dissertation presents two practical,
 secure systems, Veil and Splinter, that
-prevents some of this data leakage. Veil minimizes
+prevent some of this data leakage. Veil minimizes
 client-side information leakage from the browser by allowing
 web page developers to enforce stronger private browsing 
 semantics without browser support. Splinter 

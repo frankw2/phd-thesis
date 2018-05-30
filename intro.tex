@@ -12,22 +12,22 @@ leak through numerous channels on both the server
 and client. As web systems become more complex, the 
 number of these channels continues to grow. More specifically,
 on the server side, data can leak through data breaches
-or malicious service administrators. Similarly, on the client side,
+or be accessed by malicious service administrators. On the client side,
 sensitive user information can leak from the browser whenever
-a user accesses a web application. How do we build secure
+a user accesses a web application. This raises an important
+question. How do we build secure
 mechanisms to prevent this data leakage?
 
-Many systems~\cite{popa:mylar, popa:cryptdb, li:sundr, feldman:sporc} 
-have focused on protecting sensitive user data stored
-in web application databases 
-from leaking as a result of data breaches or malicious 
-database administrators. However, the focus of
+Much research has focused on building systems~\cite{popa:mylar, popa:cryptdb, li:sundr, feldman:sporc} 
+that protect sensitive user data stored in web application databases
+from leaking as a result of data breaches or malicious service
+providers. However, the focus of
 this dissertation is different. We are not protecting sensitive 
 user data that already exists on the server.
 Instead, we build systems
 that prevent data leakage on the client (Veil), specifically
 from the browser, and that protect sensitive user data in queries (Splinter).
-In the section below, we provide an overview of Veil and Splinter.
+In the section below, we provide an overview of these two systems.
 
 \subsection{Our Systems}
 
@@ -81,18 +81,20 @@ than what the browser alone can provide.
 
 Many online services let users query datasets such as maps, flight prices, patents,
 and medical information. The datasets themselves do not contain sensitive user information,
-but unfortunately, users' queries on these datasets reveal highly
-sensitive information that can compromise users' privacy. 
+but unfortunately, users' queries on these datasets can reveal sensitive information.
 This dissertation presents Splinter, a system that protects users' queries and
 scales to realistic applications.
 A user splits her query into multiple parts and sends each part 
 to a different provider that holds a copy of the data.
 As long as any one of the providers is honest and does not collude with the
 others, the providers cannot determine the query.
-Splinter uses and extends a new cryptographic primitive called Function Secret Sharing (FSS) that makes it up to an order of magnitude more efficient than prior systems based on Private Information Retrieval and garbled circuits.
+Splinter uses and extends a new cryptographic primitive called Function Secret Sharing (FSS) 
+that makes it up to an order of magnitude more efficient than prior systems based on 
+other cryptographic techniques such as Private Information Retrieval and garbled circuits.
 We develop protocols extending FSS to new types of queries, such as MAX and TOPK queries. 
 We also provide an optimized implementation of FSS using AES-NI instructions and multicores.
-Splinter achieves end-to-end latencies below 1.6 seconds for realistic workloads including a Yelp clone, flight search, and map routing.
+Splinter achieves end-to-end latencies below 1.6 seconds for realistic workloads 
+including a Yelp clone, flight search, and map routing.
 
 %\subsubsection{Dissertation Roadmap}
 %
