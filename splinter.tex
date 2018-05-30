@@ -1043,6 +1043,11 @@ as described in Section~\ref{sec:min-max}. Although most queries will probably
 not have this many disjoint conditions, we test this query to show
 that Splinter's protocol for this case is also practical.
 
+Note that for Q2 and Q3, the communication costs will be higher compared
+to Q1 because in Q2 and Q3, 
+we are returning ASCII-encoded strings of the restaurant names rather
+than just an integer in Q1.
+
 %Although the intermediate table is smaller, the FSS scheme has to process more bits.
 %Finally, in this query, the slower multi-party FSS with Paillier 
 %and caching previous FSS evaluations during the query are not useful
@@ -1111,8 +1116,7 @@ the breakdown of time spent on querying the grid and transit node table.
 One observation is that the multi-party version is slightly faster than the two party
 version because it is faster at processing the grid query as shown in Figure~\ref{fig:map-results}.
 The two-party version of FSS requires using GMP operations, which is slower than integer operations
-used in the multi-party version, but as shown in Figure~\ref{fig:big-results}, the two-party
-version requires much less bandwidth.
+used in the multi-party version, but the two-party version requires less bandwidth.
 
 \begin{figure}
 	\centering
@@ -1148,7 +1152,7 @@ the aggregation locally, leading to a larger response size than the two-party pr
 Overall, the multi-party protocols have higher total bandwidth compared to the two-party protocols
 despite some differences in response size. However, FSS is a relatively new cryptographic
 primitive, especially compared to PIR and garbled circuits, so we believe that
-improvements in multi-party FSS protocol could 
+improvements in the FSS protocol could 
 lower these communication costs in the future.
 
 As stated in Section~\ref{sec:splinter_cases}, querying with 

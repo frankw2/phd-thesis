@@ -284,7 +284,12 @@
 \renewcommand\listfigurename{Figures and tables}
 
 \begin{document}
-
+% Shift sectioning commands to start at \chapter
+\let\subsubsubsection\subsubsection
+\let\subsubsection\subsection
+\let\subsection\section
+\let\section\chapter
+	
 \input{code/fmt}
 
 \input{title}
@@ -308,11 +313,6 @@
 % \newpage
 % \listoftables
 
-% Shift sectioning commands to start at \chapter
-\let\subsubsubsection\subsubsection
-\let\subsubsection\subsection
-\let\subsection\section
-\let\section\chapter
 
 \input{intro}
 \input{veil}
