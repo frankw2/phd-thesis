@@ -10,18 +10,25 @@ political preferences, and income~\cite{narayanan2010myths, narayanan2008robust}
 Unfortunately, this data can 
 leak through numerous channels on both the server
 and client. As web systems become more complex, the 
-number of these channels continues to grow. More specifically,
-on the server side, data can leak through data breaches
+number of these channels continues to grow. Moreover,
+not only is there more data but also the number of 
+applications that handle and access this data is growing.
+For example, on the server side, data can leak through breaches
 or be accessed by malicious service administrators. On the client side,
 sensitive user information can leak from the browser whenever
 a user accesses a web application. These scenarios raise an important
-question. How do we build practical, secure
+question: how do we build practical, secure
 mechanisms to prevent this data leakage?
+
+%Data leakage is by no means a new problem. However, current
+%users are exchanging data with web services at a substantially
+%higher frequency. Not only is there more sensitive data but also
+%the number of applications that handle and access this data
+%is growing. 
 
 Much research has focused on building systems~\cite{popa:mylar, popa:cryptdb, li:sundr, feldman:sporc} 
 that protect sensitive user data stored in web application databases
-or cloud providers
-from leaking as a result of data breaches or malicious service
+or cloud providers from leaking as a result of data breaches or malicious service
 providers. However, the focus of
 this dissertation is different. We are not protecting sensitive 
 user data that already exists on the server.

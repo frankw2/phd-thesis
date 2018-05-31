@@ -938,7 +938,7 @@ Overall, our experiments show the following:
 	\item{Splinter can support realistic applications including the search features of Yelp and flight search sites, and data structures
 		required for map routing.}
 	\item{Splinter achieves end-to-end latencies below 1.6 seconds for queries in these applications on realistic data.}
-	\item{Splinter's protocols use up to 10$\times$ fewer round trips than prior systems and have lower response times.}
+	\item{Splinter's protocols have fewer round trips, lower bandwidth, and lower server-side computation costs than prior systems.}
 \end{itemize}
 
 
@@ -1135,6 +1135,16 @@ used in the multi-party version, but the two-party version requires less bandwid
 	\label{fig:map-results}
 \end{figure}
 
+\paragraph{Discussion:}
+Splinter has response times of 50 ms to 1.6 seconds. Although these response times are
+much higher compared to a system with FSS and Splinter, 
+privacy-sensitive users are often willing
+to trade some performance for better security. For
+example, fetching a website on Tor 
+takes a couple of seconds~\cite{torStats}.
+Therefore, we believe that our performance is 
+acceptable.
+
 \subsubsection{Communication Costs}
 \label{sec:communication}
 Figure~\ref{fig:big-results} shows the total bandwidth of a query request and response
@@ -1294,9 +1304,60 @@ For free-text search, simple keywords that map to a category (e.g., ``grocery st
 
 \begin{figure}
 	\centering
+	\begin{tabular}{lcc}
+		%\multicolumn{3}{c}{Round Trips (RTs) Required}\\
+		\toprule
+		\bf Splinter Query & \bf RTs in~\cite{goldberg} & \bf RTs in Splinter \\
+		\midrule
+		Restaurant Q1 & 6 & 1 \\
+		\midrule
+		Restaurant Q2 & 6 & 1 \\ 
+		\midrule
+		Restaurant Q3 & 6 & 11 \\
+		\midrule
+		Flights Q1 & 13 & 1 \\
+		\midrule
+		Flights Q2 & 8 & 1 \\
+		\midrule
+		Map Routing & 19 & 2 \\
+		\bottomrule
+	\end{tabular}
+	\caption{Round trips required in Olumofin et al.~\cite{goldberg} and Splinter.\protect\footnotemark}
+	\label{fig:rt-comparison}
+\end{figure}
+
+\begin{figure}
+	\centering
 	\includegraphics[width=\textwidth]{splinter-figs/bandwidth_comparison.pdf}
-	\caption{For our queries, we show the total bandwidth for Splinter and Olumofin et al~\cite{goldberg}}
+	\caption{Total bandwidth for Splinter and Olumofin et al.~\cite{goldberg}}
 	\label{fig:bandwidth_comp}
+\end{figure}
+
+\footnotetext{
+	The number of round trips in Restaurant Q3 is $O(\log n)$ in both Splinter and Olumofin et al., but the absolute number is higher in Splinter because we use a binary search whereas Olumofin et al.~use a 4-ary tree. Splinter could also use a 4-ary search to achieve the same number of round trips, but we have not yet implemented this.}
+
+\begin{figure}
+	\centering
+	\begin{tabular}{lcc}
+		%\multicolumn{3}{c}{Round Trips (RTs) Required}\\
+		\toprule
+		\bf Splinter Query & \bf Time in~\cite{goldberg} & \bf Time in Splinter \\
+		\midrule
+		Restaurant Q1 & 40 ms & 40 ms \\
+		\midrule
+		Restaurant Q2 & 135 ms & 130 ms \\ 
+		\midrule
+		Restaurant Q3 & 1.1 s & 1.1 s \\
+		\midrule
+		Flights Q1 & 10.9 s & 0.97 s \\
+		\midrule
+		Flights Q2 & 150 ms & 15 ms \\
+		\midrule
+		Map Routing & 10.6 s & 1.1 s \\
+		\bottomrule
+	\end{tabular}
+	\caption{Server-side computation costs for Olumofin et al.~\cite{goldberg} and Splinter.}
+	\label{fig:serverside-comparison}
 \end{figure}
 
 To the best of our knowledge, the most recent
@@ -1341,9 +1402,26 @@ disjoint OR conditions used in Restaurant Q3, so we assumed that they issue a se
 for each OR condition. Splinter has much lower overall communication
 costs, especially for the queries on the larger flights and maps
 databases. The main reason for this is that the bandwidth
-in PIR depends both database size (specifically a square root factor) 
+in PIR depends on both the number of database records (specifically a square root factor) 
 and record size whereas in FSS, the bandwidth depends just on the record size and is
-independent of the database size.
+independent of the number of records. Therefore, the disparity in bandwidth
+will increase as the database size increases. This larger bandwidth
+is problematic on mobile networks where data is more expensive.
+
+Figure~\ref{fig:serverside-comparison} shows the server-side computation
+costs for both systems. As expected, there is not much difference 
+on the smaller restaurant database, but the difference is much larger
+on the bigger databases. However, Olumofin et al. has higher round trips
+for the smaller database, which increases the overall response times. For example,
+in our experimental setup with 14 ms network latency, Olumofin et al. would 
+incur an additional 70 ms delay versus Splinter for the restaurant queries. 
+This delay increases as we move to mobile networks. If we replace
+the client with a mobile device on a 4G network, the network latency
+would be approximately 100 ms~\cite{mobile-delays}. Therefore,
+the restaurant queries would incur an additional 500 ms delay in Olumofin et al.
+compared to Splinter. For bigger databases, the number of round trips increases,
+so the total amount of latency incurred will also increase. For instance,
+for maps, the additional latency on Olumofin et al. would be about 1.7 seconds.
 
 %We see a similar performance difference from the results
 %in~\cite{goldberg}'s evaluation, which reports response times of
@@ -1355,7 +1433,7 @@ independent of the database size.
 %on high-latency networks.
 Finally, the system in~\cite{goldberg} has weaker security guarantees:
 it requires \textit{all} the providers to be honest, whereas Splinter
-only requires that \textit{one} provider is honest.
+only requires that \textit{one} provider is honest. 
 
 %For maps, a recent system by Wu et al.~\cite{wu2016} used
 %garbled circuits for map routing. They achieve response times
@@ -1388,32 +1466,6 @@ only requires that \textit{one} provider is honest.
 %\label{fig:comparison}
 %\end{figure}
 
-\begin{figure}
-	\centering
-		\begin{tabular}{lcc}
-			%\multicolumn{3}{c}{Round Trips (RTs) Required}\\
-			\toprule
-			\bf Splinter Query & \bf RTs in~\cite{goldberg} & \bf RTs in Splinter \\
-			\midrule
-			Restaurant Q1 & 10 & 1 \\
-			\midrule
-			Restaurant Q2 & 6 & 1 \\ 
-			\midrule
-			Restaurant Q3 & 6 & 11 \\
-			\midrule
-			Flights Q1 & 13 & 1 \\
-			\midrule
-			Flights Q2 & 8 & 1 \\
-			\midrule
-			Map Routing & 19 & 2 \\
-			\bottomrule
-		\end{tabular}
-	\caption{For our queries, we show the round trips required for the system of Olumofin et al.~\cite{goldberg} and Splinter.\protect\footnotemark}
-	\label{fig:rt-comparison}
-\end{figure}
-
-\footnotetext{
-	The number of round trips in Restaurant Q3 is $O(\log n)$ in both Splinter and Olumofin et al., but the absolute number is higher in Splinter because we use a binary search whereas Olumofin et al.~use a 4-ary tree. Splinter could also use a 4-ary search to achieve the same number of round trips, but we have not yet implemented this.}
 
 \subsubsection{FSS Microbenchmarks}
 \label{sec:micro}
@@ -1456,12 +1508,10 @@ the time to generate the function share and evaluate it is proportional
 to $2^{n/2}$ where $n$ is the number of bits in the input domain. 
 The size of the share scales with $2^{n/2}$
 rather than just $n$ in the two-party case. 
-An important observation
-is that using one-way compression 
+An important observation is that using one-way compression 
 functions instead of AES does not make a significant difference for multi-party 
-FSS because the PRG is called
-less often compared to two-party FSS. 
-For small input domains ($<$ 20 bits),
+FSS because the PRG is called less often compared to two-party FSS. 
+For small input domains ($<$ 20 bits), 
 the multi-party version of FSS is faster than the 2-party version, but 
 a provider cannot aggregate locally for SUM and COUNT queries in the multi-party version.
 %However, for smaller input domains, at the
@@ -1703,7 +1753,7 @@ and many users need to access the same dataset.
 Splinter is a new private query system that protects sensitive parameters
 in SQL-like queries while scaling to realistic applications. Splinter uses and extends a recent
 cryptography primitive, Function Secret Sharing (FSS),
-allowing it to achieve up to an order of magnitude better
+allowing it to achieve much better
 performance compared to previous private query systems. We develop
 protocols to execute complex queries
 with low computation and bandwidth. As a proof of concept,
