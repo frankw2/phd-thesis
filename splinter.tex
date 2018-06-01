@@ -1343,11 +1343,11 @@ For free-text search, simple keywords that map to a category (e.g., ``grocery st
 		\toprule
 		\bf Splinter Query & \bf Time in~\cite{goldberg} & \bf Time in Splinter \\
 		\midrule
-		Restaurant Q1 & 40 ms & 40 ms \\
+		Restaurant Q1 & 80 ms & 40 ms \\
 		\midrule
-		Restaurant Q2 & 135 ms & 130 ms \\ 
+		Restaurant Q2 & 245 ms & 130 ms \\ 
 		\midrule
-		Restaurant Q3 & 1.1 s & 1.1 s \\
+		Restaurant Q3 & 1.2 s & 1.1 s \\
 		\midrule
 		Flights Q1 & 10.9 s & 0.97 s \\
 		\midrule
@@ -1363,7 +1363,12 @@ For free-text search, simple keywords that map to a category (e.g., ``grocery st
 To the best of our knowledge, the most recent
 private query system that can perform a similar class of queries
 as Splinter is that of Olumofin et al.~\cite{goldberg},
-which uses multi-party PIR. We simulate our case study queries 
+which uses multi-party PIR. In PIR, a user can query for an index $i$
+without revealing the index or the result to the servers, making 
+it a more restricted querying model compared to FSS, but Olumofin et al.
+develops protocols to extend PIR beyond just index querying. 
+
+We simulate our case study queries 
 on their system with similar parameters.
 We compare only two-party Splinter with Olumofin et al.
 because the system of Olumofin et al. assumes only two parties 
@@ -1375,10 +1380,11 @@ In particular, we compare Olumofin et al. and Splinter on
 the following three metrics: number of  
 round trips, bandwidth, and server-side computation. 
 
-Olumofin et al. creates
+Figure~\ref{fig:rt-comparison} shows 
+the round trips required in Olumofin et al.'s system and in Splinter
+for the queries in our case studies. Olumofin et al. creates
 an $m$-ary ($m=4$) B+ index tree for the dataset and
-uses PIR to search through
-it to return various results. As a result, their queries
+uses PIR to extract the results. Consequently, their queries
 require $O(\log_m n)$ round trips, where $n$ is
 the number of records. In Splinter, the number of rounds trips
 does not depend on the size of the database for most queries.
@@ -1388,12 +1394,6 @@ conditions where Splinter's
 communication is similar; if there are a small number of disjoint
 conditions, Splinter will be faster than previous systems 
 because the user can issue parallel queries.
-
-Figure~\ref{fig:rt-comparison} shows 
-the round trips required in Olumofin et al.'s system and in Splinter
-for the queries in our case studies. Splinter improves over~\cite{goldberg}
-by up to an order of magnitude. Restaurant Q3
-uses a disjoint MAX, so the number of round trips is similar.
 
 Figure~\ref{fig:bandwidth_comp} shows the total bandwidth
 required in Olumofin et al.'s system and in Splinter. Note that
@@ -1706,8 +1706,10 @@ of large records.
 
 The systems above have a weaker
 security model: \textit{all} the providers need to be honest.
-Splinter requires only \textit{one} honest provider and 
-is more efficient because it 
+Note that both systems above are designed and optimized, assuming
+two servers, and it is not obvious that these optimizations hold beyond two servers.
+Splinter requires only \textit{one} honest provider and can efficiently support
+two and three servers because it 
 extends Function Secret Sharing (FSS)~\cite{fss,gilboa2014distributed}, which 
 enables executions of complex operations such as SUMs in one round trip
 instead of only extracting one data record at a time.
