@@ -1409,9 +1409,11 @@ will increase as the database size increases. This larger bandwidth
 is problematic on mobile networks where data is more expensive.
 
 Figure~\ref{fig:serverside-comparison} shows the server-side computation
-costs for both systems. As expected, there is not much difference 
-on the smaller restaurant database, but the difference is much larger
-on the bigger databases. However, Olumofin et al. has higher round trips
+costs for both systems. As expected, the difference is minimal 
+on the smaller restaurant database but greater on the larger databases. 
+Although the PIR scheme used in Olumofin et al. has similar performance to
+FSS, their protocols require more PIR operations per record.
+Compared to Splinter, Olumofin et al. also has more round trips
 for the smaller database, which increases the overall response times. For example,
 in our experimental setup with 14 ms network latency, Olumofin et al. would 
 incur an additional 70 ms delay versus Splinter for the restaurant queries. 
@@ -1423,24 +1425,9 @@ compared to Splinter. For bigger databases, the number of round trips increases,
 so the total amount of latency incurred will also increase. For instance,
 for maps, the additional latency on Olumofin et al. would be about 1.7 seconds.
 
-%We see a similar performance difference from the results
-%in~\cite{goldberg}'s evaluation, which reports response times of
-%of 2-18 seconds for queries with several million records, compared to
-%50 ms to 1.6 seconds in Splinter.
-%Moreover, the experiments in~\cite{goldberg} do not use a real network,
-%despite having a large number 
-%of round trips, so their response times would be even longer
-%on high-latency networks.
 Finally, the system in~\cite{goldberg} has weaker security guarantees:
 it requires \textit{all} the providers to be honest, whereas Splinter
-only requires that \textit{one} provider is honest. 
-
-%For maps, a recent system by Wu et al.~\cite{wu2016} used
-%garbled circuits for map routing. They achieve response times
-%of 140-784 seconds for their maps with Los Angeles as their largest map,
-%and require 8-16 MB of total bandwidth. Splinter has a response time of 1.2
-%seconds on a larger map (NYC), which is $100\times$ lower, and with
-%a total bandwidth of 45-725 KB, which is $10\times$ lower.
+only requires that \textit{one} provider is honest.
 
 %\begin{figure}
 %\centering
