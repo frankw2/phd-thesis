@@ -8,7 +8,7 @@ ind = np.arange(0, 12, 2)
 width = 0.5
 
 splinter = (2.8, 23.5, 245, 8.6, 3.6, 44)
-olumofin = (16, 128, 512, 128, 128, 640)
+olumofin = (16, 128, 512, 192, 128, 640)
 
 rects1 = ax.bar(ind, splinter, width, color='k', edgecolor='k')
 rects2 = ax.bar(ind + width, olumofin, width, color='0.5', edgecolor='k')

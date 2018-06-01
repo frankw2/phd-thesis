@@ -10,10 +10,10 @@ users can access crowdsourced information,
 such as the most up-to-date
 traffic data to determine the fastest route.
 Similarly, businesses can use this data to better
-understand user behavior and better market products. 
+understand user behavior and market products. 
 Many of these applications currently allow users
 to query these datasets, but an increasing number
-are allowing businesses and researchers to query
+are allowing also businesses and researchers to query
 this data. However, the problem is that 
 these queries can reveal sensitive information,
 such as user behavior, identifiable personal information, 
@@ -36,7 +36,7 @@ and business strategy~\cite{narayanan2010myths, narayanan2008robust}.
 %information collected by these services~\cite{ravichandran2009capturing, yelp-compromise, twitter-compromise}.
 
 This dissertation presents Splinter, a practical system that allows servers
-to properly respond to user queries without learning the sensitive information 
+to properly respond to user queries without servers learning the sensitive information 
 present in the queries.
 In Splinter, the user divides each query into shares and sends them to different
 \emph{providers}, which are services hosting a copy of the dataset (Figure~\ref{fig:overview}).
@@ -133,7 +133,7 @@ data to be hosted on these providers. In both scenarios,
 the providers store the data in cleartext. 
 
 Users issue queries to the provider.
-For a given user query, all the providers have to run it on the same
+For a given user query, all the providers have to execute it on the same
 view of the data. Maintaining data consistency
 from mirror sites is beyond the scope of this dissertation, but
 standard techniques can be used~\cite{tewari2002wcdp,chi2008novel}.
@@ -209,7 +209,7 @@ mechanisms in place to limit user access to this data.
 
 The easiest way to achieve this property would be for users to download the whole database
 and run the queries locally. However, as described in Section~\ref{sec:splinter_cases}
-downloading so much data might not be feasible. 
+doing this might not be feasible. 
 %However, this requires substantial bandwidth and computation for the user.
 %Moreover, many datasets change constantly, e.g., to include traffic information or new product reviews.
 %It would be impractical for the user to continuously download these updates.
@@ -461,7 +461,8 @@ we can support most of their search features as shown in Section~\ref{sec:case_s
 
 Finally, Splinter only ``natively'' supports fixed-width integer data
 types. However, such integers can also be used to encode strings and
-fixed-precision floating point numbers (e.g., SQL DECIMALs).
+fixed-precision floating point numbers (e.g., SQL DECIMALs). 
+For strings in predicates, we can also encode them using hashes.
 We use them to represent other types of data in our sample applications.
 
 \subsection{Executing Splinter Queries}
@@ -1137,11 +1138,11 @@ used in the multi-party version, but the two-party version requires less bandwid
 
 \paragraph{Discussion:}
 Splinter has response times of 50 ms to 1.6 seconds. Although these response times are
-much higher compared to a system with FSS and Splinter, 
+much higher compared to a system without FSS and Splinter, 
 privacy-sensitive users are often willing
 to trade some performance for better security. For
 example, fetching a website on Tor 
-takes a couple of seconds~\cite{torStats}.
+takes 3-4 seconds~\cite{torStats}.
 Therefore, we believe that our performance is 
 acceptable.
 
@@ -1162,8 +1163,7 @@ the aggregation locally, leading to a larger response size than the two-party pr
 Overall, the multi-party protocols have higher total bandwidth compared to the two-party protocols
 despite some differences in response size. However, FSS is a relatively new cryptographic
 primitive, especially compared to PIR and garbled circuits, so we believe that
-improvements in the FSS protocol could 
-lower these communication costs in the future.
+improvements in the FSS protocol could lower these communication costs in the future.
 
 As stated in Section~\ref{sec:splinter_cases}, querying with 
 Splinter and PIR systems should be more efficient than
@@ -1365,12 +1365,15 @@ private query system that can perform a similar class of queries
 as Splinter is that of Olumofin et al.~\cite{goldberg},
 which uses multi-party PIR. In PIR, a user can query for an index $i$
 without revealing the index or the result to the servers, making 
-it a more restricted querying model compared to FSS, but Olumofin et al.
-develops protocols to extend PIR beyond just index querying. 
+it a more restrictive querying model compared to FSS, but Olumofin et al.
+develops protocols to extend PIR beyond just index querying. However,
+FSS can perform many of the complex queries in Olumofin et al.
+without additional protocols, such as COUNT and SUM 
+with non-index predicates.
 
 We simulate our case study queries 
 on their system with similar parameters.
-We compare only two-party Splinter with Olumofin et al.
+We compare the two-party version of Splinter with Olumofin et al.
 because the system of Olumofin et al. assumes only two parties 
 and does not describe how to handle more servers.
 \footnote{From our understanding, it is possible for Olumofin et al. to support
@@ -1403,8 +1406,9 @@ for each OR condition. Splinter has much lower overall communication
 costs, especially for the queries on the larger flights and maps
 databases. The main reason for this is that the bandwidth
 in PIR depends on both the number of database records (specifically a square root factor) 
-and record size whereas in FSS, the bandwidth depends just on the record size and is
-independent of the number of records. Therefore, the disparity in bandwidth
+and record size whereas in FSS, the bandwidth is
+independent of the number of records and depends just on the record size. 
+Therefore, the disparity in bandwidth
 will increase as the database size increases. This larger bandwidth
 is problematic on mobile networks where data is more expensive.
 
@@ -1419,8 +1423,8 @@ for the smaller database, which increases the overall response times. For exampl
 in our experimental setup with 14 ms network latency, Olumofin et al. would 
 incur an additional 70 ms delay versus Splinter for the restaurant queries. 
 This delay increases as we move to mobile networks. If we replace
-the client with a mobile device on a 4G network, the network latency
-would be approximately 100 ms~\cite{mobile-delays}. Therefore,
+the client with a mobile device on a 4G network with 
+latency of approximately 100 ms~\cite{mobile-delays}, 
 the restaurant queries would incur an additional 500 ms delay in Olumofin et al.
 compared to Splinter. For bigger databases, the number of round trips increases,
 so the total amount of latency incurred will also increase. For instance,
@@ -1491,7 +1495,7 @@ AES as a PRG.
 
 \paragraph{Multi-party FSS:}
 As shown in Figure~\ref{fig:micro2}, for the multi-party FSS 
-scheme from~\cite{fss} that only uses one-way functions, 
+scheme from~\cite{fss},
 the time to generate the function share and evaluate it is proportional
 to $2^{n/2}$ where $n$ is the number of bits in the input domain. 
 The size of the share scales with $2^{n/2}$
@@ -1664,7 +1668,6 @@ Using the appropriate consistency techniques is dependent
 on the application and an active area of research.
 Applying those techniques in Splinter is beyond the scope
 of this dissertation.
-
 
 \subsection{Related Work}
 \label{spl-sec:related}
