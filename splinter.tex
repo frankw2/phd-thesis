@@ -913,8 +913,8 @@ Our FSS library implementation can be found at \url{https://github.com/frankw2/l
 \end{figure*}
 
 We built and evaluated clones of three applications 
-on Splinter: restaurant reviews, flight data, and map routing, using real datasets.
-We also compare Splinter to previous private systems, and estimate hosting costs.
+on Splinter: Yelp clone, flight price lookup, and map routing, using real datasets.
+We also compared Splinter to previous private systems, and estimate hosting costs.
 Our providers ran on 64-core Amazon EC2 \texttt{x1} servers with Intel Xeon E5-2666 Haswell processors and 1.9 TB 
 of RAM. The client was a 2 GHz Intel Core i7 machine with 8 GB of RAM.
 Our client's network latency to the providers was 14 ms.
@@ -953,7 +953,7 @@ Here, we discuss the three application clones
 we built on Splinter. Figure~\ref{fig:big-results}
 summarizes our results, and Figure~\ref{fig:datasets}
 describes the sizes and characteristics of our three datasets.
-Finally, we also reviewed the search features available in real websites
+Finally, we also review the search features available in real websites
 to study how many Splinter supports.
 
 \paragraph{Restaurant review site:}
@@ -1068,7 +1068,7 @@ assume a cached Top 10 intermediate table.
 %has an input domain of 13 bits.
 
 \paragraph{Map routing:}
-We implement a private map routing service, using real traffic map data from~\cite{dimacs} for New York City.
+We implement a private map routing service, using real traffic map data from DIMACS~\cite{dimacs} for New York City.
 However, implementing map routing in Splinter is difficult because the providers can
 perform only a restricted set of operations. The challenge is to find a shortest path 
 algorithm compatible with Splinter. Fortunately,
@@ -1091,7 +1091,7 @@ in her source and destination grid. She locally finds the shortest path to the s
 and destination transit node. Finally, she queries the provider for the shortest path
 between the two transit nodes.
 
-We used the source code from~\cite{tnr} and identified the 1333 transit nodes. We divided the map into 5000 grids,
+We used the source code from Arz et al.~\cite{tnr} and identified the 1333 transit nodes. We divided the map into 5000 grids,
 and calculated the shortest path for all transit node pairs. The grid table has 5000 rows
 representing the edges and nodes in a grid, and the transit node table has about 800,000
 rows representing the number of shortest paths for all transit node pairs. 
@@ -1121,7 +1121,6 @@ used in the multi-party version, but the two-party version requires less bandwid
 	\label{fig:map-results}
 \end{figure}
 
-\paragraph{Discussion:}
 Splinter has response times of 50 ms to 1.6 seconds. Although these response times are
 much higher compared to a system without FSS and Splinter, 
 privacy-sensitive users are often willing
@@ -1151,23 +1150,27 @@ primitive, especially compared to PIR and garbled circuits, so we believe that
 improvements in the FSS protocol could lower these communication costs in the future.
 
 As stated in Section~\ref{sec:splinter_cases}, querying with 
-Splinter and PIR systems should be more efficient than
+Splinter and PIR systems might be more efficient than
 downloading the whole database, assuming that such a download is possible
 (no rate limiting or query restrictions). To better quantify
-the "break even" point, i.e. where the communication costs is equal
+the "break even" point, i.e. where the communication costs are equal
 to the database size, we look at our case study datasets.
-For Restaurant Q1 and the 2-party version of Q2, 
-it would take 1000-10,000 queries before reaching that point. 
-Users probably query Yelp 1-2 times a day, so it would take at least a year
-to reach the break even point. As a result, it might more sense to use
-Splinter as updates might occur during that time period.
-For Restaurant Q3 and multi-party Q2, it would take about 10-100 queries to reach
-that point. In this case, it might make sense to download the whole database, 
-but improvements to FSS could lower the costs of bandwidth in the future.
-For flights, it would take about 550-100,000 queries, and for maps,
-it would take 2500-25,000 queries. However, these two databases are larger
+For two-party Restaurant Q1, it will take about 10,000 of these types of queries
+before reaching that point.
+For multi-party Restaurant Q1 and two-party Restaurant Q2, it would take about 1000 queries.
+For multi-party Restaurant Q2 and Restaurant Q3, 
+it would take about 10 queries to reach that point. However, users tend to issue
+different kinds of queries and updates might happen, it is not obvious
+whether downloading the whole database or using Splinter would be more efficient
+for this case study. Moreover, the purpose of this case study is to compare
+Splinter's performance on smaller datasets to prior systems and to larger datasets.
+For flights, it would take about 550 queries for multi-party Flights Q1 and 
+50,000 queries for the other flight queries. Finally, for maps,
+it would take 25,000 queries for the two-party version and 2500 for the multi-party
+version. However, these two databases are larger
 than Yelp and change more frequently, so it might not make sense
-to download the database.
+to download the database. We discuss Splinter-amenable web services
+in more detail in Section~\ref{sec:splinter_cases}.
 
 %\subsection{Impact of caching FSS outputs}
 %\label{sec:eval_cache}
@@ -1356,17 +1359,21 @@ FSS can perform many of the complex queries in Olumofin et al.
 without additional protocols, such as COUNT and SUM 
 with non-index predicates.
 
-We simulate our case study queries 
-on their system with similar parameters.
+We implemented the logic in Olumofin et al., ported our
+case queries, and ran them on the same Amazon AWS setup as Splinter
+(described at the beginning of this section).
 We compare the two-party version of Splinter with Olumofin et al.
 because the system of Olumofin et al. assumes only two parties 
-and does not describe how to handle more servers.
+and does not describe how to extend it to more servers.
 \footnote{From our understanding, it is possible for Olumofin et al. to support
-	more than two parties, but server-side computation and bandwidth would increase
-	substantially, eliminating effects of the optimizations described in their paper.}
+	more than two parties, but server-side computation and bandwidth would increase, 
+	most likely eliminating effects of the optimizations described in their paper.}
 In particular, we compare Olumofin et al. and Splinter on
 the following three metrics: number of  
-round trips, bandwidth, and server-side computation. 
+round trips, bandwidth, and server-side computation. We find
+that across all of our queries, Splinter is almost always 
+more efficient than Olumofin et al., often by an order of 
+magnitude or more.
 
 Figure~\ref{fig:rt-comparison} shows 
 the round trips required in Olumofin et al.'s system and in Splinter
@@ -1415,9 +1422,9 @@ compared to Splinter. For bigger databases, the number of round trips increases,
 so the total amount of latency incurred will also increase. For instance,
 for maps, the additional latency on Olumofin et al. would be about 1.7 seconds.
 
-Finally, the system in~\cite{goldberg} has weaker security guarantees:
-it requires \textit{all} the providers to be honest, whereas Splinter
-only requires that \textit{one} provider is honest.
+%Finally, the system in~\cite{goldberg} has weaker security guarantees:
+%it requires \textit{all} the providers to be honest, whereas Splinter
+%only requires that \textit{one} provider is honest.
 
 %\begin{figure}
 %\centering
@@ -1557,7 +1564,7 @@ can be used to pay for the queries.
 Splinter's trust model, where only one provider needs to be honest, also makes 
 it easy for new providers to join the market, increasing users' privacy.
 
-This businesses seems reasonable as studies have shown that 
+This business model seems reasonable as studies have shown that 
 many consumers are willing to pay for services that protect their privacy~\cite{atlantic,atlantic2}. 
 In fact, users might not use certain services because of privacy concerns~\cite{ravichandran2009capturing,riley2008tolls}.
 Similarly, more users are using sites like DuckDuckGo and technologies like Tor 
@@ -1644,15 +1651,15 @@ In a similar manner, users querying geographic data may be willing to
 reveal their location at the country or state level but would like to
 keep their location inside the state or country private.
 
-\paragraph{Maintaining consistent data views:}
-Splinter requires that each provider executes a given user
-query on the same copy of the data. 
-Much research in distributed systems has focused on ensuring
-databases consistency across multiple providers~\cite{spanner, ongaro:raft, tu:silo}.
-Using the appropriate consistency techniques is dependent
-on the application and an active area of research.
-Applying those techniques in Splinter is beyond the scope
-of this dissertation.
+%\paragraph{Maintaining consistent data views:}
+%Splinter requires that each provider executes a given user
+%query on the same copy of the data. 
+%Much research in distributed systems has focused on ensuring
+%databases consistency across multiple providers~\cite{spanner, ongaro:raft, tu:silo}.
+%Using the appropriate consistency techniques is dependent
+%on the application and an active area of research.
+%Applying those techniques in Splinter is beyond the scope
+%of this dissertation.
 
 \subsection{Related Work}
 \label{spl-sec:related}
@@ -1678,17 +1685,15 @@ Popcorn~\cite{popcorn} is a media delivery service that
 uses PIR to hide user consumption habits from the provider
 and content distributor. However, Popcorn is optimized for
 streaming media databases, like Netflix, which have a small number (about 8000)
-of large records. 
+of large records, so Popcorn serves a different purpose than Splinter.
 
-The systems above have a weaker
-security model: \textit{all} the providers need to be honest.
+%The systems above have a weaker
+%security model: \textit{all} the providers need to be honest.
 Note that both systems above are designed and optimized, assuming
 two servers, and it is not obvious that these optimizations hold beyond two servers.
-Splinter requires only \textit{one} honest provider and can efficiently support
-two and three servers because it 
+Splinter can efficiently support two and three servers because it 
 extends Function Secret Sharing (FSS)~\cite{fss,gilboa2014distributed}, which 
-enables executions of complex operations such as SUMs in one round trip
-instead of only extracting one data record at a time.
+enables executions of complex operations such as SUMs in one round trip.
 
 \paragraph{Garbled circuits:}
 Systems such as Embark~\cite{lan2016embark}, BlindBox~\cite{blindbox}, 
