@@ -3,20 +3,26 @@
 
 \subsection{Motivation}
 
-Web applications are collecting increasing amounts
-of data, and this data contains information useful
+Web services are collecting increasing amounts
+of data, and this data contains information of interest
 to both users and businesses. For example,
 users can access crowdsourced information,
 such as the most up-to-date
 traffic data to determine the fastest route.
-Similarly, businesses can use this data to better
-understand user behavior and market products. 
+Similarly, businesses can leverage this data to extract
+cross-user trends that would be difficult or impossible to
+detect if users could not be compared to each other. 
 Many of these applications currently allow users
-to query these datasets, but an increasing number
+to query these datasets. For example, users might search
+WebMD for some information on their medical condition. Similarly,
+they might also search Yelp to find a restaurant for dinner.
+Moreover, an increasing number
 are allowing also businesses and researchers to query
-this data. However, the problem is that 
+this data. Google, for instance, has an API to allow
+businesses to query its map data to help them make
+better business decision. However, the problem is that 
 these queries can reveal sensitive information,
-such as user behavior, identifiable personal information, 
+such as medical conditions, user behavior, 
 and business strategy~\cite{narayanan2010myths, narayanan2008robust}.
 
 %Many online services let users query large datasets:
@@ -35,15 +41,15 @@ and business strategy~\cite{narayanan2010myths, narayanan2008robust}.
 %Even when the services are honest, server compromise and subpoenas can leak the sensitive user
 %information collected by these services~\cite{ravichandran2009capturing, yelp-compromise, twitter-compromise}.
 
-This dissertation presents Splinter, a practical system that allows servers
-to properly respond to user queries without servers learning the sensitive information 
-present in the queries.
-In Splinter, the user divides each query into shares and sends them to different
-\emph{providers}, which are services hosting a copy of the dataset (Figure~\ref{fig:overview}).
+To solve these problems, we introduce Splinter, a practical system that allows servers
+to properly respond to queries without servers learning the sensitive information 
+present in the queries. In Splinter, each \emph{provider} hosts a copy of the dataset Figure~\ref{fig:overview}).
+Then, the user\footnote{In this dissertation, we use the term "user"
+to refer to a business, a researcher, and end-user of an application.} 
+divides each query into shares and sends them to these providers.
 As long as any one of the providers is honest and does not
 collude with the others, the providers cannot discover sensitive
-information in the query.
-However, given responses from all the providers, the user
+information in the query. However, given responses from all the providers, the user
 can compute the answer to her query.
 
 \begin{figure}
@@ -61,31 +67,33 @@ can compute the answer to her query.
 
 Previous private query systems have generally not achieved practical performance
 because they use expensive cryptographic primitives and protocols.
-For example, systems based on other cryptographic techniques such
+For example, systems based on techniques such
 as Private Information Retrieval (PIR)~\cite{goldberg,chor1997private,pir-search} 
 require many round trips and high bandwidth for complex queries, while systems based on garbled
 circuits~\cite{wu2016,lan2016embark,ben2008fairplaymp} have a high computational cost.
 These approaches are especially costly for mobile clients on high-latency networks.
 
-Instead, Splinter is the first system to use and extend a recent cryptographic primitive called
+To make private queries efficient, 
+Splinter extends a recent cryptographic primitive called
 Function Secret Sharing (FSS)~\cite{fss, gilboa2014distributed} for private queries.
-FSS allows the client to split certain functions into shares that keep parameters of the
+FSS allows the client to split functions into shares that keep parameters of the
 function hidden unless all the providers collude.
 With judicious use of FSS, many queries can be answered in only a single network round trip
 with low CPU and bandwidth costs.
 
-Splinter makes two contributions over previous work on FSS.
+Splinter extends previous work on FSS in two important ways.
 First, prior work has only demonstrated efficient FSS protocols for point and interval functions with additive aggregates such as SUMs~\cite{fss}.
-We present protocols that support a more complex set of non-additive aggregates such as MAX/MIN and TOPK at low computational and communication cost.
+We present efficient protocols that support a more complex set of non-additive aggregates such as MAX/MIN and TOPK.
 Together, these protocols let Splinter support a subset of SQL that can capture many popular online applications.
 
-Second, we develop an optimized implementation of FSS for modern hardware that leverages AES-NI~\cite{aes-ni} instructions and multicore CPUs.
-For example, using the one-way compression functions that utilize modern AES instruction sets, our implementation is 2.5$\times$ faster per core than a na\"ive implementation of FSS.
+Second, we develop an optimized implementation of FSS that leverages AES-NI~\cite{aes-ni} instructions and multicore CPUs.
+For example, we use one-way compression functions, a cryptographic technique that utilizes modern AES instruction sets. 
+As a result, our implementation is 2.5$\times$ faster per core than a na\"ive implementation of FSS.
 Together, these optimizations let Splinter query datasets with millions of records at sub-second latency on a single server.
 
 We evaluate Splinter by implementing 
-three applications over it: a restaurant review site similar to Yelp, 
-airline ticket search, and map routing.
+three applications atop it: a restaurant review site similar to Yelp, 
+an airline ticket search, and a map routing service.
 For all of our applications, Splinter can execute queries in less than 1.6 seconds, at a cost of less than 0.05 cents in server resources on Amazon EC2.
 %Splinter's low cost means that providers could profitably run a Splinter-based service
 %similar to OpenStreetMap routing~\cite{osm}, an open-source maps service, while only charging users a few dollars per month.
@@ -119,17 +127,23 @@ For all of our applications, Splinter can execute queries in less than 1.6 secon
 \subsection{Splinter Architecture}
 \label{sec:goals}
 
-Splinter aims to protect sensitive information in users' queries
-from providers. This section provides an overview of Splinter's architecture,
-use cases, security goals, and threat model.
+In this section, we describe Splinter's principals and security goals.
+Then, we discuss what services are amenable to Splinter and conclude
+with the threat model.
 
-\subsubsection{Splinter Overview}
+\subsubsection{Splinter Principals}
 \label{sec:model}
-There are two main principals in Splinter: the \emph{user} and the \emph{providers}.
-Each provider hosts a copy of the data. Providers can 
-retrieve this data from a public repository or mirror site.
-Similarly, data owners, like Yelp and Google Maps, can license
-data to be hosted on these providers. In both scenarios,
+There are three main principals in Splinter: the \emph{user}, 
+the \emph{data owners}, and the \emph{providers}.
+
+Data owners, such as Yelp and Google, collect data, but 
+they have to be comfortable releasing this data and making 
+it "public." By public, we mean that the data does not
+contain sensitive user information.
+
+Providers host a copy of the data. They can 
+retrieve this data from a public repository or mirror site,
+or license them from data owners. In both scenarios,
 the providers store the data in cleartext. 
 
 Users issue queries to the provider.
@@ -139,51 +153,6 @@ from mirror sites is beyond the scope of this dissertation, but
 standard techniques can be used~\cite{tewari2002wcdp,chi2008novel}.
 %For example, OpenStreetMap~\cite{osm} publishes publicly available 
 %map, point-of-interest, and traffic data. 
-
-As shown in Figure~\ref{fig:overview}, 
-to issue a query in Splinter, a user
-splits her query into \textit{shares}, using the Splinter client,
-and submits each share to a different provider.
-The user can select any providers of her choice that host the dataset.
-The providers use their shares to execute the user's query 
-over the cleartext data, using the Splinter provider library. 
-As long as one provider is \textit{honest}
-(does not collude with others), the user's sensitive information in the original query
-remains private. When the user receives the corresponding responses from the providers,
-she combines them to obtain the final answer to her original query. 
-%In Section~\ref{sec:queries},
-%we will describe in more detail how the user creates these function shares and how
-%the provider uses them to execute the user's query.
-
-\subsubsection{Use Cases}
-\label{sec:splinter_cases}
-Although Splinter can handle complex queries, it is not
-meant as a private query system for all SQL-like databases.
-Splinter's use cases are similar to those of PIR. More specifically,
-the queries contain sensitive user information and need to be 
-protected, but the database itself does not contain
-sensitive user information. For example, users might not
-want to reveal where they are traveling to Google when searching
-for directions. Similarly, data analysts might want to hide
-their query parameters because they might leak trade
-secrets for their algorithms.
-
-Splinter works well for applications with large databases
-and regular updates because downloading the whole
-database and receiving updates would be more expensive in terms
-of bandwidth than querying the Splinter service. Services,
-like flight prices, map navigation, stock prices, 
-and domain name availability searches, are good fits for Splinter.
-In Section~\ref{sec:communication}, we discuss and 
-quantify the "break even" point for our case studies.
-
-Even if it is more efficient for the user to download the whole
-database and updates, Splinter can still be useful.
-Many applications might enforce rate limiting or query restrictions
-to prevent users from accessing the whole database
-because the data might contain proprietary information.
-For example, Yelp might allow limited querying
-for data scientists through an API but not give complete access to their dataset. 
 
 \subsubsection{Security Goals}
 \label{sec:query_model}
@@ -200,37 +169,57 @@ ORDER BY price
 Splinter hides the information represented by the questions marks, i.e.,
 the source and destination in this example.
 The column names being selected and filtered are not hidden.
-Finally, Splinter also hides the query's results---otherwise,
-these might be used to infer the source and destination. 
+Finally, Splinter also hides the query's results from the providers---otherwise,
+the results could be used to infer the source and destination. 
 Splinter supports a subset of the SQL language, which we describe in Section~\ref{sec:querymodel}.
-Note that the data is in cleartext, and Splinter's goal is not to protect the data on 
-the server side. However, the data owners or providers might have 
-mechanisms in place to limit user access to this data.
 
-The easiest way to achieve this property would be for users to download the whole database
+The easiest way to achieve these properties would be for users to download the whole database
 and run the queries locally. However, as described in Section~\ref{sec:splinter_cases}
 doing this might not be feasible. 
-%However, this requires substantial bandwidth and computation for the user.
-%Moreover, many datasets change constantly, e.g., to include traffic information or new product reviews.
-%It would be impractical for the user to continuously download these updates.
-%Therefore, our performance objective is to minimize computation and communication costs.
-%For a database of $n$ records, Splinter only requires $O(n \log n)$ computation at the
-%providers and $O(\log n)$ communication (Section~\ref{sec:complex}).
+
+\subsubsection{Splinter-amenable Web Services}
+\label{sec:splinter_cases}
+Although Splinter can handle complex queries, it is not
+meant as a private query system for all SQL-like databases.
+Splinter's use cases are similar to those of PIR. More specifically,
+the queries contain sensitive user information and need to be 
+protected, but the database itself does not contain
+sensitive user information. For example, users might not
+want to reveal where they are traveling to Google when searching
+for directions. Similarly, data analysts might want to hide
+their query parameters because they might leak trade
+secrets for their algorithms.
+
+Splinter works well for applications with large databases
+and regular updates because downloading the whole
+database and receiving updates would be more expensive in terms
+of bandwidth than querying the Splinter service. Services,
+like flight price lookups, map navigation,
+and domain name availability searches, are good fits for Splinter.
+In Section~\ref{sec:communication}, we discuss and 
+quantify the "break even" point for our case studies.
+
+Even if it is more efficient for the user to download the whole
+database and updates, Splinter can still be useful.
+Many applications might enforce rate limiting or query restrictions
+to prevent users from accessing the whole database
+because the data might contain proprietary information.
+For example, Yelp might allow only limited querying
+for data scientists through an API but not give complete access to their dataset.
+In this scenario, attempting a full download would be too expensive
+in comparison to employing the normal client-server query interface.
 
 \subsubsection{Threat Model}
 Splinter keeps the parameters in the user's query hidden
 as long as at least one of the user-chosen providers does not collude with others. 
-Splinter also assumes these providers are \textit{honest but curious}: a provider can observe the interactions between
+Splinter also assumes these providers are \textit{passive adversaries}: a provider can observe the interactions between
 itself and the client, but 
 Splinter does not protect against providers returning incorrect results or maliciously modifying the dataset.
 
-We assume the data is in cleartext and that the user communicates with each provider through a secure channel (e.g., using SSL),
-and that the user's Splinter client is uncompromised. 
-%Protecting attacks on a user's machine are outside of the scope of Splinter.
+We assume the data on the providers 
+is in cleartext and that the user communicates with each provider through a secure channel (e.g., using SSL),
+and that the user's Splinter client is uncompromised.
 Our cryptographic assumptions are standard.
-We only assume the existence of one-way functions.
-%In our implementation for multiple providers, the security of Paillier encryption~\cite{paillier} is also assumed.
-
 
 \subsection{Function Secret Sharing}
 \label{sec:queries}

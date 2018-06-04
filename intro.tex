@@ -88,17 +88,17 @@ than what the browser alone can provide.
 
 \subsubsection{Splinter: Practical, Private Web Application Queries}
 
-Many online services let users query datasets such as maps, flight prices, patents,
-and medical information. The datasets themselves do not contain sensitive user information,
-but unfortunately, users' queries on these datasets can reveal sensitive information.
-This dissertation presents Splinter, a system that protects users' queries and
+Many online services let users and businesses query datasets such as maps, flight prices, patents,
+and medical information. The datasets themselves do not contain sensitive information,
+but unfortunately, queries on these datasets can reveal sensitive information.
+This dissertation presents Splinter, a system that protects queries and
 scales to realistic applications.
 A user splits her query into multiple parts and sends each part 
 to a different provider that holds a copy of the data.
-As long as any one of the providers is honest and does not collude with the
+As long as any one of the providers does not collude with the
 others, the providers cannot determine the query.
 Splinter uses and extends a new cryptographic primitive called Function Secret Sharing (FSS) 
-that makes it up to an order of magnitude more efficient than prior systems based on 
+that makes more efficient than prior systems based on 
 other cryptographic techniques such as Private Information Retrieval and garbled circuits.
 We develop protocols extending FSS to new types of queries, such as MAX and TOPK queries. 
 We also provide an optimized implementation of FSS using AES-NI instructions and multicores.
