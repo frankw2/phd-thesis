@@ -16,11 +16,11 @@ Many of these applications currently allow users
 to query these datasets. For example, users might search
 WebMD for some information on their medical condition. Similarly,
 they might also search Yelp to find a restaurant for dinner.
-Moreover, an increasing number
-are allowing also businesses and researchers to query
-this data. Google, for instance, has an API to allow
-businesses to query its map data to help them make
-better business decisions. However, the problem is that 
+Moreover, an increasing number of these web services
+are allowing businesses and researchers to query
+this data. Google, for instance, has an API that allows
+organizations to query its map data to improve business decisions.
+However, the problem is that 
 these queries can reveal sensitive information,
 such as medical conditions, user behavior, 
 and business strategy~\cite{narayanan2010myths, narayanan2008robust}.
@@ -43,8 +43,8 @@ and business strategy~\cite{narayanan2010myths, narayanan2008robust}.
 
 To solve these problems, we introduce Splinter, a practical system that allows servers
 to properly respond to queries without servers learning the sensitive information 
-present in the queries. In Splinter, each \emph{provider} hosts a copy of the dataset Figure~\ref{fig:overview}).
-Then, the user\footnote{In this dissertation, we use the term "user" broadly
+present in the queries. In Splinter, each \emph{provider} hosts a copy of the dataset (Figure~\ref{fig:overview}).
+Then, the user\footnote{In this chapter of the dissertation, we use the term "user" broadly
 to refer to a business, a researcher, and end-user of an application, i.e. any client of Splinter.} 
 divides each query into shares and sends them to these providers.
 As long as any one of the providers is honest and does not
@@ -133,17 +133,17 @@ with the threat model.
 
 \subsubsection{Splinter Principals}
 \label{sec:model}
-There are three main principals in Splinter: the \emph{user}, 
-the \emph{data owners}, and the \emph{providers}.
+There are three main principals in Splinter: 
+the \emph{data owners}, the \emph{providers}, and the \emph{user}.
 
 Data owners, such as Yelp and Google, collect data, but 
 they have to be comfortable releasing this data and making 
 it "public." By public, we mean that the data does not
-contain sensitive user information. 
+contain sensitive user information and can be stored in cleartext.
 
 Providers host a copy of the data. They can 
 retrieve this data from a public repository or mirror site,
-or license them from data owners. In both scenarios,
+or license it from data owners. In both scenarios,
 the providers store the data in cleartext. 
 
 Users issue queries to the provider.
@@ -170,7 +170,7 @@ Splinter hides the information represented by the questions marks, i.e.,
 the source and destination in this example.
 The column names being selected and filtered are not hidden.
 Finally, Splinter also hides the query's results from the providers---otherwise,
-the results could be used to infer the source and destination. 
+the providers can use the results to infer the source and destination. 
 Splinter supports a subset of the SQL language, which we describe in Section~\ref{sec:querymodel}.
 
 The easiest way to achieve these properties would be for users to download the whole database
@@ -206,7 +206,7 @@ to prevent users from accessing the whole database
 because the data might contain proprietary information.
 For example, Yelp might allow only limited querying
 for data scientists through an API but not give complete access to their dataset.
-In this scenario, attempting a full download would be too expensive
+In this scenario, attempting a full database download would be too expensive
 in comparison to employing the normal client-server query interface.
 
 \subsubsection{Threat Model}
@@ -1413,7 +1413,7 @@ FSS, their protocols require more PIR operations per record.
 Compared to Splinter, Olumofin et al. also has more round trips
 for the smaller database, which increases the overall response times. For example,
 in our experimental setup with 14 ms network latency, Olumofin et al. would 
-incur an additional 70 ms delay versus Splinter for the restaurant queries. 
+incur an additional 70 ms delay versus Splinter for Restaurant Q1 and Restaurant Q2. 
 This delay increases as we move to mobile networks. If we replace
 the client with a mobile device on a 4G network with 
 latency of approximately 100 ms~\cite{mobile-delays}, 
@@ -1535,7 +1535,7 @@ a provider cannot aggregate locally for SUM and COUNT queries in the multi-party
 
 \subsubsection{Hosting Costs}
 \label{sec:pricing}
-We estimate Splinter's server-side computation cost on Amazon EC2, 
+We estimate Splinter's server-side computation cost on Amazon AWS, 
 where the cost of a CPU-second using Amazon Lambda is about 0.005 cents. 
 The cost of storage and running a web server can be amortized over requests.
 We found that most of our queries cost less than 0.005 cents. Map queries are a bit more costly,
