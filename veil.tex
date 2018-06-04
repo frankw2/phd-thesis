@@ -322,16 +322,12 @@ any information about particular Veil sites
 
 Veil assumes that web developers only include
 trusted content that has gone through the Veil
-compiler.
-% jwm: I think that the sentence below is redundant,
-%      given the previous sentence.
-% Thus, Veil assumes that a page does not embed
-%  unrewritten libraries that update local storage
-% or issue unblinded network requests.
-A page may embed third party content like a JavaScript
+compiler. A page may embed third party content like a JavaScript
 library, but the Veil compiler analyzes both
 first party and third party content during compilation
-(\S\ref{sec:compiler}).
+(\S\ref{sec:compiler}). Veil also assumes
+that blinding servers do not maliciously 
+modify content given to them by the web developers.
 
 Heap walking (\S\ref{sec:heapWalk}) allows Veil
 to prevent sensitive RAM artifacts from swapping to
