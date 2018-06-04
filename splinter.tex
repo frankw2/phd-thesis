@@ -20,7 +20,7 @@ Moreover, an increasing number
 are allowing also businesses and researchers to query
 this data. Google, for instance, has an API to allow
 businesses to query its map data to help them make
-better business decision. However, the problem is that 
+better business decisions. However, the problem is that 
 these queries can reveal sensitive information,
 such as medical conditions, user behavior, 
 and business strategy~\cite{narayanan2010myths, narayanan2008robust}.
@@ -44,8 +44,8 @@ and business strategy~\cite{narayanan2010myths, narayanan2008robust}.
 To solve these problems, we introduce Splinter, a practical system that allows servers
 to properly respond to queries without servers learning the sensitive information 
 present in the queries. In Splinter, each \emph{provider} hosts a copy of the dataset Figure~\ref{fig:overview}).
-Then, the user\footnote{In this dissertation, we use the term "user"
-to refer to a business, a researcher, and end-user of an application.} 
+Then, the user\footnote{In this dissertation, we use the term "user" broadly
+to refer to a business, a researcher, and end-user of an application, i.e. any client of Splinter.} 
 divides each query into shares and sends them to these providers.
 As long as any one of the providers is honest and does not
 collude with the others, the providers cannot discover sensitive
@@ -89,7 +89,7 @@ Together, these protocols let Splinter support a subset of SQL that can capture 
 Second, we develop an optimized implementation of FSS that leverages AES-NI~\cite{aes-ni} instructions and multicore CPUs.
 For example, we use one-way compression functions, a cryptographic technique that utilizes modern AES instruction sets. 
 As a result, our implementation is 2.5$\times$ faster per core than a na\"ive implementation of FSS.
-Together, these optimizations let Splinter query datasets with millions of records at sub-second latency on a single server.
+Together, these optimizations let Splinter query datasets with millions of records at sub-second latency.
 
 We evaluate Splinter by implementing 
 three applications atop it: a restaurant review site similar to Yelp, 
@@ -139,7 +139,7 @@ the \emph{data owners}, and the \emph{providers}.
 Data owners, such as Yelp and Google, collect data, but 
 they have to be comfortable releasing this data and making 
 it "public." By public, we mean that the data does not
-contain sensitive user information.
+contain sensitive user information. 
 
 Providers host a copy of the data. They can 
 retrieve this data from a public repository or mirror site,
@@ -174,7 +174,7 @@ the results could be used to infer the source and destination.
 Splinter supports a subset of the SQL language, which we describe in Section~\ref{sec:querymodel}.
 
 The easiest way to achieve these properties would be for users to download the whole database
-and run the queries locally. However, as described in Section~\ref{sec:splinter_cases}
+and run the queries locally. However, in Section~\ref{sec:splinter_cases}, we explain why
 doing this might not be feasible. 
 
 \subsubsection{Splinter-amenable Web Services}
@@ -232,8 +232,8 @@ query model and our new techniques for more complex queries.
 \label{sec:fss_overview}
 Function Secret Sharing~\cite{fss} lets a client divide
 a function $f$ into \textit{function shares} 
-$f_1,f_2,\dots,f_k$ so that multiple parties
-can help evaluate $f$ without learning certain of its parameters.
+$f_1,f_2,\dots,f_k$ so that $k$ parties
+can help evaluate $f$ without learning certain parameters.
 These shares have the following properties:
 
 \begin{itemize}
@@ -259,11 +259,9 @@ These take the following forms:
 In both cases, FSS keeps the parameters $a$ and $b$ private: an adversary can tell that
 it was given a share of a point or interval function, but cannot find $a$ and $b$.
 In Splinter, we use the FSS scheme of Boyle et al.~\cite{fss}.
-Under this scheme, the shares $f_i$ for both functions require $O(\lambda n)$ bits to
-describe and $O(\lambda n)$ bit operations to evaluate for a security parameter $\lambda$ (the size
-of cryptographic keys), and $n$ is the number of bits in the input domain.
-%This contrasts to $O(n)$ bits and operations to describe and evaluate the original
-%functions.
+Under this scheme, the shares $f_i$ for both functions require $O(\lambda \ell)$ bits to
+describe and $O(\ell)$ bit operations to evaluate for a security parameter $\lambda$ (the size
+of cryptographic keys), and $\ell$ is the number of bits in the input domain.
 
 \subsubsection{Using FSS for Database Queries}
 \label{sec:fss_queries}
@@ -294,15 +292,15 @@ but does not want to reveal this value.
 
 To run this query, the Splinter client defines a point function $f(x)=1$ if $x=5$
 or 0 otherwise.
-It then divides this function into function shares $f_1,\dots,f_n$ and
-distributes them to the providers, as shown in Figure~\ref{fig:fss_overview}.
+It then divides this function into function shares $f_1,\dots,f_k$ and
+distributes them to the $k$ providers, as shown in Figure~\ref{fig:fss_overview}.
 For simplicity, suppose that there are two providers, who receive shares
 $f_1$ and $f_2$.
 Because these shares are additive, we know that $f_1(x)+f_2(x)=f(x)$
 for every input $x$.
 Thus, each provider $p$ can compute $f_p(\mathrm{ItemId})$ for every ItemId in the
 database table, and send back $r_p = \sum_{i=1}^n f_p(\mathrm{ItemId}_i)$
-to the client.
+to the client where $n$ is the number of database records.
 The client then computes $r_1 + r_2$, which is equal
 to $\sum_{i=1}^n f(\mathrm{ItemId}_i)$, that is, the count of all matching
 records in the table.
@@ -794,19 +792,17 @@ hash functions and hence only $O(\log k)$ extra communication bandwidth.
 Figure~\ref{fig:complexity} summarizes the complexity of Splinter's query evaluation protocols
 based on the aggregates and condition classes used.
 We note that in all cases, the computation time is $O(n \log n)$ and the communication costs
-are much smaller than the size of the database.
+are smaller than the size of the database.
 This makes Splinter practical even for databases with millions of records, which covers
 many common web application datasets, as shown in Section~\ref{sec:evaluation}.
 Finally, the main operations used to evaluate Splinter queries at providers, namely sorting
-and sums, are highly parallelizable, letting Splinter take advantage of parallel hardware.
+and sums, are highly parallelizable.
 
 \subsection{Optimized FSS Implementation}
 \label{sec:fastfss}
 
 Apart from introducing new protocols to evaluate complex queries using FSS,
 Splinter includes an FSS implementation optimized for modern hardware.
-In this section, we describe our implementation and also discuss
-how to select the best multi-party FSS scheme for a given query.
 
 The two-party FSS protocol~\cite{fss} is efficient
 because of its use of one-way functions.
