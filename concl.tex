@@ -16,6 +16,15 @@ These systems have raised new interesting questions,
 especially regarding the practicality of 
 systems for secure multi-party computation and private queries.
 
+Veil is the first platform to allow developers to provide stronger
+private browsing semantics directly to users. A few other key questions remain.
+How do we handle more complex content like videos? Right now, we assume
+that developers create a pool of blinding servers. However, content delivery
+networks and proxies are becoming more prevalent. How do we leverage this
+existing infrastructure to make Veil more usable? Is it easy to turn
+these proxies into blinding servers? What specifically needs to change to allow
+for this? 
+
 Splinter leveraged
 function secret sharing (FSS) to reduce the overhead associated with private queries compared to previous
 work. However, open research problems still remain. For example, can private queries scale to billions
@@ -29,6 +38,8 @@ cross-organization data sharing. MPC is a well-studied cryptographic solution to
 impracticality has prevented widespread adoption. However, FSS and MPC are closely related, and 
 the creation of FSS has shown promise for more practical protocols. In particular,
 are there ways to perform MPC practically on more complex computations, such as graph queries?
+
+
 
 With the increased number of data and privacy breaches, users are becoming
 more aware of the "cost" of using web services, i.e. providing these services
