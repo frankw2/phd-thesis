@@ -47,8 +47,8 @@ present in the queries. In Splinter, each \emph{provider} hosts a copy of the da
 Then, the user\footnote{In this chapter of the dissertation, we use the term "user" broadly
 to refer to a business, a researcher, and end-user of an application, i.e. any client of Splinter.} 
 divides each query into shares and sends them to these providers.
-As long as any one of the providers is honest and does not
-collude with the others, the providers cannot discover sensitive
+As long as any one of the providers is honest (does not
+collude with the others), the providers cannot discover sensitive
 information in the query. However, given responses from all the providers, the user
 can compute the answer to her query.
 
@@ -60,7 +60,7 @@ can compute the answer to her query.
 		The Splinter client splits each user query into shares and sends them to multiple
 		providers. It then combines their results to obtain
 		the final answer.
-		The user's query remains private as long as any one provider is honest.
+		The user's query remains private as long as any one provider does not collude with the others.
 	}
 	\label{fig:overview}
 \end{figure}
@@ -211,7 +211,7 @@ in comparison to employing the normal client-server query interface.
 
 \subsubsection{Threat Model}
 Splinter keeps the parameters in the user's query hidden
-as long as at least one of the user-chosen providers does not collude with others. 
+as long as at least one of the user-chosen providers does not collude (share information or communicate) with the others.
 Splinter also assumes these providers are \textit{passive adversaries}: a provider can observe the interactions between
 itself and the client, but 
 Splinter does not protect against providers returning incorrect results or maliciously modifying the dataset.
