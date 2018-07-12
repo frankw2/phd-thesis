@@ -56,7 +56,7 @@ the fact that, even though developers do not control the
 client-side browser implementation, developers do
 control 1) the content that is sent to those browsers,
 and 2) the servers which deliver that content.
-Veil web sites collectively store their content
+Veil-enabled web sites collectively store their content
 on Veil's \emph{blinding servers} instead
 of on individual, site-specific servers. To publish
 a new page, developers pass their HTML, CSS, and
@@ -64,7 +64,7 @@ JavaScript files to Veil's compiler; the compiler
 transforms the URLs in the content so that, when
 the page loads on a user's browser, URLs are derived
 from a secret user key. The blinding service and
-the Veil page exchange encrypted
+the Veil-enabled page exchange encrypted
 data that is also protected by the user's key. The
 result is that Veil pages can safely store encrypted
 content in the browser cache; furthermore, the URLs exposed
@@ -77,14 +77,12 @@ secret data is paged out), content mutation (which
 garbles in-memory artifacts if they do get swapped out),
 and DOM hiding (which prevents the browser from
 learning site-specific HTML, CSS, and JavaScript
-content in the first place). Veil pages load on unmodified
+content in the first place). Veil-enabled pages load on unmodified
 commodity browsers, allowing developers to provide
 stronger semantics for private browsing without forcing
 users to install or reconfigure their machines. Veil
 provides these guarantees even if the user does not
-visit a page using a browser's native privacy mode;
-indeed, Veil's protections are \emph{stronger}
-than what the browser alone can provide.
+visit a page using a browser's native privacy mode.
 
 \subsubsection{Splinter: Practical, Private Web Application Queries}
 
@@ -98,7 +96,7 @@ to a different provider that holds a copy of the data.
 As long as any one of the providers does not collude with the
 others, the providers cannot determine the query.
 Splinter uses and extends a new cryptographic primitive called Function Secret Sharing (FSS) 
-that makes more efficient than prior systems based on 
+that makes it more efficient than prior systems based on 
 other cryptographic techniques such as Private Information Retrieval and garbled circuits.
 We develop protocols extending FSS to new types of queries, such as MAX and TOPK queries. 
 We also provide an optimized implementation of FSS using AES-NI instructions and multicores.
