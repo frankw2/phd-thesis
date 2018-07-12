@@ -138,8 +138,9 @@ the browser's address bar.
 % Blinded references also protect against more subtle data
 % exfiltrations, like the use of CSS styles to detect which
 % resources a browser has previously downloaded~\cite{cssHistoryAttack,cssHistoryAttack2}.
-Encryption allows a Veil-enabled page, which we will simply
-refer to as a Veil page, to safely leverage the
+Encryption allows a Veil page~\footnote{We use the term \textit{Veil page}
+	to refer to a Veil-enabled page in this dissertation.} 
+to safely leverage the
 browser cache to reduce page load times, or store user data
 across different sessions of the private web page. A page
 that desires the highest level of security will eschew even
@@ -394,7 +395,7 @@ example, if the original image tag looked like this:
 \end{verbatim}
 the compiler would replace that tag with the following:
 \begin{verbatim}
-<script>obscuraFetch("b6a0d...");</script>
+<script>veilFetch("b6a0d...");</script>
 \end{verbatim}
 where the argument to \texttt{veilFetch()} is the hash
 name of the image. At page load time, when
@@ -1670,7 +1671,13 @@ benchmarking tool~\cite{ab}.
 As shown in Figure~\ref{fig:scalability}, Veil
 reduces web server throughput by roughly 70\%
 due to the additional cryptographic operations
-that Veil must perform. Remember that when
+that Veil must perform. By quantifying 
+Veil's scalability penalty for a fixed client load
+compared to a regular web
+server, blinding server hosts 
+can know the additional servers needed 
+to handle a specific load on a Veil page.
+Remember that when
 Veil operates in regular (i.e., non-DOM hiding
 mode), Veil blinding servers mutate content in
 the background, out of the critical path for an
@@ -2023,6 +2030,22 @@ via the non-sandboxed parts of the host OS. For example,
 unmodified RAM artifacts may page to the native swap file;
 DNS requests are exposed to the host's name resolution
 subsystem.
+
+Amazon Silk~\cite{amazon-silk} is a browser used on Amazon
+Kindles and uses a technique called remote dependency 
+resolution (also known as split browsing)~\cite{rc2, parcel}. 
+When the Silk client issues an HTTP request for a web page,
+the request actually goes to an Amazon-maintained 
+proxy that runs in the cloud. The proxy then uses a headless
+browser to load the requested page. Since the proxy lives
+in the core of the Internet, the proxy can fetch objects
+over low-latency network paths. As the proxy fetches these
+objects, they are streamed back to the user. This technique
+allows Silk to avoid high last-mile latencies afflicting the path
+between the client and Internet core. However, the client-side Silk browser
+still loads regular DOM objects, like HTML, Javascript, CSS, etc.,
+thus not implementing DOM hiding that exists in Veil. It also
+does not protect RAM artifacts or provide content mutation.
 
 Collaborative browsing frameworks~\cite{lowet09,jigsawCollab}
 allow multiple users with different browsers to
