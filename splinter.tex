@@ -9,16 +9,16 @@ to both users and businesses. For example,
 users can access crowdsourced information,
 such as the most up-to-date
 traffic data to determine the fastest route.
-Similarly, businesses can leverage this data to extract
+Similarly, businesses can leverage this crowdsourced data to extract
 cross-user trends that would be difficult or impossible to
-detect if users could not be compared to each other. 
-Many of these applications currently allow users
-to query these datasets. For example, users might search
+detect without this data.
+Many of these applications that crowdsource data 
+currently allow users to query their datasets. For example, users might search
 WebMD for some information on their medical condition. Similarly,
 they might also search Yelp to find a restaurant for dinner.
-Moreover, an increasing number of these web services
-are allowing businesses and researchers to query
-this data. Google, for instance, has an API that allows
+An increasing number of web services with crowdsourced data
+are also allowing businesses and researchers to query
+their dataset. Google, for instance, has an API that allows
 organizations to query its map data to improve business decisions.
 However, the problem is that 
 these queries can reveal sensitive information,
@@ -41,7 +41,7 @@ and business strategy~\cite{narayanan2010myths, narayanan2008robust}.
 %Even when the services are honest, server compromise and subpoenas can leak the sensitive user
 %information collected by these services~\cite{ravichandran2009capturing, yelp-compromise, twitter-compromise}.
 
-To solve these problems, we introduce Splinter, a practical system that allows servers
+To solve this problem, we introduce Splinter, a practical system that allows servers
 to properly respond to queries without servers learning the sensitive information 
 present in the queries. In Splinter, each \emph{provider} hosts a copy of the dataset (Figure~\ref{fig:overview}).
 Then, the user\footnote{In this chapter of the dissertation, we use the term "user" broadly
@@ -168,7 +168,8 @@ ORDER BY price
 \end{verbatim}
 Splinter hides the information represented by the questions marks, i.e.,
 the source and destination in this example.
-The column names being selected and filtered are not hidden.
+The column names being selected and filtered are not hidden. The number 
+of conditions in the WHERE clause is also not hidden.
 Finally, Splinter also hides the query's results from the providers---otherwise,
 the providers can use the results to infer the source and destination. 
 Splinter supports a subset of the SQL language, which we describe in Section~\ref{sec:querymodel}.
@@ -217,7 +218,7 @@ itself and the client, but
 Splinter does not protect against providers returning incorrect results or maliciously modifying the dataset.
 
 We assume the data on the providers 
-is in cleartext and that the user communicates with each provider through a secure channel (e.g., using SSL),
+is stored in cleartext and that the user communicates with each provider through a secure channel (e.g., using SSL),
 and that the user's Splinter client is uncompromised.
 Our cryptographic assumptions are standard.
 
@@ -1383,7 +1384,7 @@ uses PIR to extract the results. Consequently, their queries
 require $O(\log_m n)$ round trips, where $n$ is
 the number of records. In Splinter, the number of rounds trips
 does not depend on the size of the database for most queries.
-As shown in Section~\ref{sec:min-max} and Section~\ref{sec:topk}, 
+As shown in Section~\ref{sec:complex-aggregates}, 
 the exception is for MIN/MAX and TOPK queries with many disjoint
 conditions where Splinter's
 communication is similar; if there are a small number of disjoint
