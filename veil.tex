@@ -1114,8 +1114,8 @@ browser to take an initial screenshot of the page. The GUI
 proxy then sends the initial screenshot via the blinding servers
 to the user's remoting stub. The stub renders the image, and
 uses page-agnostic JavaScript event handlers to detect
-GUI interactions like mouse clicks, keyboard presses, and
-scrolling activity. The stub forwards those events to the GUI
+GUI interactions like mouse clicks and keyboard presses. 
+The stub forwards those events to the GUI
 proxy. The proxy replays those events in the headless
 browser, and ships the resulting screen images back to the
 client. Note that a page which uses DOM hiding will not

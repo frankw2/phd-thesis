@@ -9,14 +9,15 @@ to both users and businesses. For example,
 users can access crowdsourced information,
 such as the most up-to-date
 traffic data to determine the fastest route.
-Similarly, businesses can leverage this crowdsourced data to extract
+Similarly, businesses can also leverage this crowdsourced data to extract
 cross-user trends that would be difficult or impossible to
 detect without this data.
 Many of these applications that crowdsource data 
 currently allow users to query their datasets. For example, users might search
-WebMD for some information on their medical condition. Similarly,
-they might also search Yelp to find a restaurant for dinner.
-An increasing number of web services with crowdsourced data
+WebMD for some information on their medical condition. 
+They might also search Yelp to find a restaurant for dinner.
+Since this data can be valuable, 
+an increasing number of web services with crowdsourced data
 are also allowing businesses and researchers to query
 their dataset. Google, for instance, has an API that allows
 organizations to query its map data to improve business decisions.
@@ -136,10 +137,14 @@ with the threat model.
 There are three main principals in Splinter: 
 the \emph{data owners}, the \emph{providers}, and the \emph{user}.
 
-Data owners, such as Yelp and Google, collect data, but 
-they have to be comfortable releasing this data and making 
-it "public." By public, we mean that the data does not
-contain sensitive user information and can be stored in cleartext.
+Data owners, such as Yelp and Google, collect non-sensitive data.
+By non-sensitive, we mean the data is not sensitive to the 
+users that provide. Although the data itself might not be sensitive,
+data owners might restrict user access to this data because
+it is valuable to the data owner. 
+For example, Google Maps traffic data might not be
+sensitive, but Google probably does not want to release this data publicly
+because it has business value.
 
 Providers host a copy of the data. They can 
 retrieve this data from a public repository or mirror site,
@@ -194,9 +199,9 @@ secrets for their algorithms.
 Splinter works well for applications with large databases
 and regular updates because downloading the whole
 database and receiving updates would be more expensive in terms
-of bandwidth than querying the Splinter service. Services,
+of bandwidth than querying the Splinter service. Services
 like flight price lookups, map navigation,
-and domain name availability searches, are good fits for Splinter.
+and domain name availability searches are good fits for Splinter.
 In Section~\ref{sec:communication}, we discuss and 
 quantify the "break even" point for our case studies.
 
@@ -925,7 +930,8 @@ Overall, our experiments show the following:
 	\item{Splinter can support realistic applications including the search features of Yelp and flight search sites, and data structures
 		required for map routing.}
 	\item{Splinter achieves end-to-end latencies below 1.6 seconds for queries in these applications on realistic data.}
-	\item{Splinter's protocols have fewer round trips, lower bandwidth, and lower server-side computation costs than prior systems.}
+	\item{Splinter's protocols have fewer round trips, lower bandwidth, and lower server-side computation costs than 
+		the most recent practical private query system by Olumofin et al.~\cite{goldberg}.}
 \end{itemize}
 
 
@@ -1152,15 +1158,25 @@ improvements in the FSS protocol could lower these communication costs in the fu
 
 As stated in Section~\ref{sec:splinter_cases}, querying with 
 Splinter and PIR systems might be more efficient than
-downloading the whole database, assuming that such a download is possible
-(no rate limiting or query restrictions). To better quantify
+downloading the whole database, assuming there is
+no rate limiting or query restrictions as described in 
+Section~\ref{sec:splinter_cases}. Query restrictions
+imposed by data owners will probably lead to more round trips and
+communication costs compared to downloading the database under normal
+network conditions.  Thus, depending on the specific 
+restrictions, using Splinter 
+might be more efficient than attempting to download the whole database
+under restricted network conditions.
+
+To better quantify
 the "break even" point, i.e. where the communication costs are equal
 to the database size, we look at our case study datasets.
-For two-party Restaurant Q1, it will take about 10,000 of these types of queries
+For the Yelp clone, we assume that the user downloads only her city (not all 40).
+For two-party Restaurant Q1, it will take about 250 of these types of queries
 before reaching that point.
-For multi-party Restaurant Q1 and two-party Restaurant Q2, it would take about 1000 queries.
+For multi-party Restaurant Q1 and two-party Restaurant Q2, it would take about 25 queries.
 For multi-party Restaurant Q2 and Restaurant Q3, 
-it would take about 10 queries to reach that point. However, users tend to issue
+it would take about 1 query to reach that point. However, users tend to issue
 different kinds of queries and updates might happen, it is not obvious
 whether downloading the whole database or using Splinter would be more efficient
 for this case study. Moreover, the purpose of this case study is to compare
