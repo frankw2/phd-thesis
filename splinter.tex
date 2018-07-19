@@ -85,7 +85,7 @@ with low CPU and bandwidth costs.
 Splinter extends previous work on FSS in two important ways.
 First, prior work has only demonstrated efficient FSS protocols for point and interval functions with additive aggregates such as SUMs~\cite{fss}.
 We present efficient protocols that support a more complex set of non-additive aggregates such as MAX/MIN and TOPK.
-Together, these protocols let Splinter support a subset of SQL that can capture many popular online applications.
+These protocols let Splinter support a subset of SQL that can capture many popular online applications.
 
 Second, we develop an optimized implementation of FSS that leverages AES-NI~\cite{aes-ni} instructions and multicore CPUs.
 For example, we use one-way compression functions, a cryptographic technique that utilizes modern AES instruction sets. 
@@ -1005,15 +1005,12 @@ For this dataset, we present results for the following three queries:
 Q1: SELECT COUNT(*) WHERE category="Thai"
 
 Q2: SELECT TOP 10 restaurant
-WHERE category="Mexican" AND
-(hex2mi=1 OR hex2mi=2 OR hex2mi=3)
+WHERE category="Mexican" AND (hex2mi=1 OR hex2mi=2 OR hex2mi=3)
 ORDER BY stars
 
 Q3: SELECT restaurant, MAX(stars) 
-WHERE category="Mexican" OR
-category="Chinese" OR category="Indian"
-OR category="Greek" OR category="Thai"
-OR category="Japanese"
+WHERE category="Mexican" OR category="Chinese" OR category="Indian"
+OR category="Greek" OR category="Thai" OR category="Japanese"
 GROUP BY category
 \end{verbatim}
 
